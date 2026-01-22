@@ -1,4 +1,4 @@
-  import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 
@@ -6,7 +6,7 @@ st.set_page_config(page_title="Dashboard Profesional", layout="wide")
 
 st.title("📊 Monitor de Objetivos Dinámico")
 
-uploaded_file = st.file_uploader("Sube el archivo 'archivo 2.xlsx'", type=["xlsx"])
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
 
 if uploaded_file:
     try:
@@ -20,12 +20,10 @@ if uploaded_file:
         col_n2 = df.columns[2]
         col_log = df.columns[3]
 
-        # 2. Asignar Marca a cada fila (Detectar a qué empresa pertenece cada sucursal)
-        # Creamos una columna auxiliar 'Marca' basada en los totales
+        # 2. Asignar Marca a cada fila
         df['Marca'] = None
         marca_actual = "Otras"
         
-        # Lógica para identificar marcas basado en la estructura de tu Excel
         for i, row in df.iterrows():
             texto = str(row[col_obj]).upper()
             if "OPENCARS" in texto: marca_actual = "OPENCARS"
@@ -89,4 +87,4 @@ if uploaded_file:
     except Exception as e:
         st.error(f"Error en el procesamiento: {e}")
 else:
-    st.info("👋 Sube el nuevo archivo Excel para activar el panel con filtros.")
+    st.info("👋 Sube tu archivo Excel para activar el panel.")
