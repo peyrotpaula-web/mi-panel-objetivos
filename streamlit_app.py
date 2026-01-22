@@ -2,73 +2,78 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Panel de Ventas Real", layout="wide")
+st.set_page_config(page_title="Panel de Control Oficial", layout="wide")
 
-st.title("📊 Control de Objetivos - Datos Verificados")
+st.title("📊 Monitor de Objetivos Dinámico")
+st.markdown("Los datos se calculan sumando únicamente las sucursales individuales para evitar duplicados.")
 
-uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
+uploaded_file = st.file_uploader("Sube el archivo 'archivo 2.xlsx'", type=["xlsx"])
 
 if uploaded_file:
     try:
-        # 1. Leer archivo y limpiar
+        # 1. Cargar datos
         df = pd.read_excel(uploaded_file)
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Identificar columnas clave por posición para evitar errores de nombres
-        # Según tu archivo: Col 2=Sucursal, Col 3=Nivel1, Col 4=Nivel2, Col 5=Logrado
-        col_sucursal = df.columns[1]
-        col_n1 = df.columns[2]
-        col_n2 = df.columns[3]
-        col_logrado = df.columns[4]
+        # Identificar columnas (Basado en tu nuevo archivo)
+        # Col 0: OBJETIVOS, Col 1: Nivel 1, Col 2: Nivel 2, Col 3: Logrado
+        col_sucursal = df.columns[0]
+        col_n1 = df.columns[1]
+        col_n2 = df.columns[2]
+        col_logrado = df.columns[3]
 
-        # --- FILTRADO DE SEGURIDAD ---
-        # Solo nos quedamos con las sucursales reales. 
-        # Descartamos cualquier fila que diga "TOTAL" o esté vacía.
+        # 2. FILTRADO CRUCIAL: Quitar filas de TOTAL y filas vacías
+        # Solo procesamos filas que NO digan "TOTAL"
         df_sucursales = df[
             (df[col_sucursal].notna()) & 
-            (~df[col_sucursal].str.contains("TOTAL", na=False, case=False)) &
-            (df[col_sucursal] != "")
+            (~df[col_sucursal].str.contains("TOTAL", na=False, case=False))
         ].copy()
 
-        # 2. CÁLCULO MANUAL (Sin duplicados)
+        # Convertir a números por seguridad
+        df_sucursales[col_n1] = pd.to_numeric(df_sucursales[col_n1], errors='coerce').fillna(0)
+        df_sucursales[col_n2] = pd.to_numeric(df_sucursales[col_n2], errors='coerce').fillna(0)
+        df_sucursales[col_logrado] = pd.to_numeric(df_sucursales[col_logrado], errors='coerce').fillna(0)
+
+        # 3. CÁLCULOS GLOBALES REALES
         total_logrado = df_sucursales[col_logrado].sum()
         total_n1 = df_sucursales[col_n1].sum()
         total_n2 = df_sucursales[col_n2].sum()
         cumplimiento = (total_logrado / total_n1 * 100) if total_n1 > 0 else 0
 
-        # --- DISEÑO DEL PANEL ---
-        st.subheader("📌 Totales Reales (Suma de Sucursales)")
+        # --- INTERFAZ DEL PANEL ---
+        st.subheader("📌 Resumen Ejecutivo")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Logrado Total", f"{int(total_logrado)}")
-        c2.metric("Objetivo Nivel 1", f"{int(total_n1)}")
-        c3.metric("Objetivo Nivel 2", f"{int(total_n2)}")
+        c1.metric("Unidades Logradas", f"{int(total_logrado)}")
+        c2.metric("Meta Nivel 1", f"{int(total_n1)}")
+        c3.metric("Meta Nivel 2", f"{int(total_n2)}")
         c4.metric("% Cumplimiento", f"{cumplimiento:.1f}%")
 
         st.divider()
 
-        # 3. GRÁFICOS
-        col_izq, col_der = st.columns(2)
+        # 4. GRÁFICOS DINÁMICOS
+        col_a, col_b = st.columns(2)
 
-        with col_izq:
-            st.write("### 🏢 Rendimiento por Sucursal")
+        with col_a:
+            st.write("### 🏢 Logrado vs Meta por Sucursal")
+            # Gráfico de barras comparativo
             fig_bar = px.bar(df_sucursales, x=col_sucursal, y=[col_logrado, col_n1],
-                             barmode='group', labels={'value': 'Unidades', 'variable': 'Tipo'},
-                             color_discrete_sequence=["#0088FE", "#FFBB28"])
+                             barmode='group', 
+                             color_discrete_map={col_logrado: "#00BCFF", col_n1: "#323232"},
+                             labels={'value': 'Unidades', 'variable': 'Categoría'})
             st.plotly_chart(fig_bar, use_container_width=True)
 
-        with col_der:
-            st.write("### 📈 Porcentaje de Avance")
+        with col_b:
+            st.write("### 🏆 Ranking de Cumplimiento")
             df_sucursales['%'] = (df_sucursales[col_logrado] / df_sucursales[col_n1] * 100)
             fig_rank = px.bar(df_sucursales.sort_values('%'), x='%', y=col_sucursal, 
                               orientation='h', color='%', color_continuous_scale="RdYlGn")
             st.plotly_chart(fig_rank, use_container_width=True)
 
-        # 4. TABLA DE AUDITORÍA (Para que verifiques fila por fila)
-        with st.expander("🔍 Ver desglose de sucursales sumadas"):
-            st.write("El sistema solo está sumando estas filas para evitar duplicar totales:")
-            st.table(df_sucursales[[col_sucursal, col_logrado, col_n1, col_n2]])
+        # 5. TABLA DE CONTROL FINAL
+        st.subheader("📋 Planilla de Verificación")
+        st.dataframe(df_sucursales[[col_sucursal, col_logrado, col_n1, col_n2]], use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error al procesar el archivo: {e}")
+        st.error(f"Ocurrió un error al leer el archivo: {e}")
 else:
-    st.info("Sube el archivo Excel para ver los datos correctos.")
+    st.info("👋 Por favor, sube tu archivo 'archivo 2.xlsx' para ver el panel actualizado.")
