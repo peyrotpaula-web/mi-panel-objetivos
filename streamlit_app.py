@@ -1,67 +1,80 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
 
-st.set_page_config(page_title="Panel de Objetivos", layout="wide")
+st.set_page_config(page_title="Panel Consolidado de Ventas", layout="wide")
 
-st.title("📊 Monitor de Objetivos")
+st.title("📊 Tablero General de Objetivos")
 
-uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
+uploaded_file = st.file_uploader("Sube tu reporte diario (.xlsx)", type=["xlsx"])
 
 if uploaded_file:
-    try:
-        # Leer Excel
-        df = pd.read_excel(uploaded_file)
-        
-        # 1. Limpieza Automática
-        df.columns = [str(c).strip() for c in df.columns]
-        df.iloc[:, 0] = df.iloc[:, 0].ffill() 
-        
-        # Identificar columnas por posición para que no falle con las fechas
-        # Col 0: Empresa, Col 1: Sucursal, Col 2: Nivel 1, Col 3: Nivel 2, Col 4: Logrado
-        col_empresa = df.columns[0]
-        col_sucursal = df.columns[1]
-        col_n1 = df.columns[2]
-        col_n2 = df.columns[3]
-        col_logrado = df.columns[4]
+    # 1. Procesamiento de datos
+    df = pd.read_excel(uploaded_file)
+    df.columns = [str(c).strip() for c in df.columns]
+    df.iloc[:, 0] = df.iloc[:, 0].ffill() # Rellenar nombres de empresas
+    
+    col_empresa, col_sucursal, col_n1, col_n2, col_logrado = df.columns[0:5]
 
-        # Filtrar filas vacías o totales
-        df_clean = df.dropna(subset=[col_sucursal]).copy()
-        df_sucursales = df_clean[~df_clean[col_sucursal].str.contains("TOTAL", na=False)].copy()
+    # Separar sucursales de los totales para no duplicar datos en los gráficos
+    df_sucursales = df[~df[col_sucursal].str.contains("TOTAL", na=False)].dropna(subset=[col_sucursal])
+    
+    # 2. SECCIÓN DE KPI GLOBALES (Todo junto)
+    total_n1 = df_sucursales[col_n1].sum()
+    total_n2 = df_sucursales[col_n2].sum()
+    total_logrado = df_sucursales[col_logrado].sum()
+    porc_n1 = (total_logrado / total_n1) * 100
 
-        # 2. Sidebar
-        st.sidebar.header("Configuración")
-        sucursal = st.sidebar.selectbox("Selecciona Sucursal:", df_sucursales[col_sucursal].unique())
-        datos_suc = df_sucursales[df_sucursales[col_sucursal] == sucursal].iloc[0]
+    st.subheader("🌐 Resumen Consolidado (Todas las Empresas)")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Logrado Total", f"{total_logrado} un.")
+    m2.metric("Objetivo Nivel 1", f"{total_n1} un.")
+    m3.metric("Objetivo Nivel 2", f"{total_n2} un.")
+    m4.metric("% Cumplimiento N1", f"{porc_n1:.1f}%")
 
-        # 3. Gráfico de Termómetro (Gauge)
-        fig = go.Figure(go.Indicator(
-            mode = "gauge+number+delta",
-            value = datos_suc[col_logrado],
-            title = {'text': f"Progreso: {sucursal}"},
-            delta = {'reference': datos_suc[col_n1]},
-            gauge = {
-                'axis': {'range': [0, datos_suc[col_n2]]},
-                'steps': [
-                    {'range': [0, datos_suc[col_n1]], 'color': "lightcoral"},
-                    {'range': [datos_suc[col_n1], datos_suc[col_n2]], 'color': "lightgreen"}
-                ],
-                'threshold': {
-                    'line': {'color': "black", 'width': 4},
-                    'thickness': 0.75,
-                    'value': datos_suc[col_n1]
-                }
-            }
-        ))
-        st.plotly_chart(fig, use_container_width=True)
+    st.divider()
 
-        # 4. Tabla de Resumen
-        st.subheader("Estado General")
-        st.table(df_sucursales[[col_empresa, col_sucursal, col_logrado, col_n1, col_n2]])
+    # 3. GRÁFICOS COMPARATIVOS
+    col_izq, col_der = st.columns(2)
 
-    except Exception as e:
-        st.error(f"Hubo un problema al leer el archivo: {e}")
-        st.info("Asegúrate de que el Excel tenga las columnas: Empresa, Sucursal, Nivel 1, Nivel 2, Logrado.")
+    with col_izq:
+        st.write("### 🏆 Logro vs Objetivos por Sucursal")
+        fig_barras = px.bar(df_sucursales, 
+                            x=col_sucursal, 
+                            y=[col_logrado, col_n1, col_n2],
+                            barmode='group',
+                            title="Comparativa de Unidades",
+                            color_discrete_sequence=["#1E88E5", "#FFC107", "#4CAF50"])
+        st.plotly_chart(fig_barras, use_container_width=True)
+
+    with col_der:
+        st.write("### 📈 % de Avance Nivel 1")
+        # Calculamos el % real para el gráfico
+        df_sucursales['% Real'] = (df_sucursales[col_logrado] / df_sucursales[col_n1]) * 100
+        fig_pct = px.bar(df_sucursales, 
+                         x=col_sucursal, 
+                         y='% Real',
+                         color='% Real',
+                         title="Porcentaje de Cumplimiento por Sucursal",
+                         color_continuous_scale="RdYlGn",
+                         range_y=[0, 120])
+        fig_pct.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="Meta N1")
+        st.plotly_chart(fig_pct, use_container_width=True)
+
+    # 4. TABLA MAESTRA ÚNICA
+    st.divider()
+    st.subheader("📋 Detalle Completo de Operaciones")
+    
+    # Aplicar color a la tabla para identificar rápido quién llegó a la meta
+    def color_cumplimiento(val):
+        color = 'background-color: #ffcccc' if val < 0.8 else 'background-color: #ccffcc'
+        return color
+
+    st.dataframe(df_sucursales.style.format({
+        df.columns[5]: "{:.1%}", 
+        df.columns[6]: "{:.1%}"
+    }).applymap(color_cumplimiento, subset=[df.columns[5]]), use_container_width=True)
+
 else:
-    st.warning("Esperando archivo Excel...")
+    st.info("👋 Bienvenida/o. Sube el archivo Excel para ver el panel unificado.")
