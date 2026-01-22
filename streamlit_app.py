@@ -2,41 +2,42 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Panel de Control Preciso", layout="wide")
+st.set_page_config(page_title="Panel de Ventas Real", layout="wide")
 
-st.title("📊 Monitor de Objetivos Verificado")
+st.title("📊 Control de Objetivos - Datos Verificados")
 
 uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
 
 if uploaded_file:
     try:
-        # 1. Leer archivo y limpiar nombres de columnas
+        # 1. Leer archivo y limpiar
         df = pd.read_excel(uploaded_file)
         df.columns = [str(c).strip() for c in df.columns]
         
-        # 2. Identificar columnas clave (buscando por palabra, no por posición)
-        col_sucursal = [c for c in df.columns if 'OBJETIVOS' in c][0]
-        col_n1 = [c for c in df.columns if 'Nivel 1' in c and 'logrado' not in c.lower()][0]
-        col_n2 = [c for c in df.columns if 'Nivel 2' in c and 'logrado' not in c.lower()][0]
-        col_logrado = [c for c in df.columns if 'Logrado' in c][0]
+        # Identificar columnas clave por posición para evitar errores de nombres
+        # Según tu archivo: Col 2=Sucursal, Col 3=Nivel1, Col 4=Nivel2, Col 5=Logrado
+        col_sucursal = df.columns[1]
+        col_n1 = df.columns[2]
+        col_n2 = df.columns[3]
+        col_logrado = df.columns[4]
 
-        # 3. Separar datos: Sucursales vs Totales de Marca
-        # Filas que son TOTALES (ej: TOTAL OC, TOTAL PW)
-        df_totales_marcas = df[df[col_sucursal].str.contains("TOTAL", na=False, case=False)]
-        
-        # Filas que son SUCURSALES (excluimos las que dicen TOTAL)
-        df_sucursales = df[~df[col_sucursal].str.contains("TOTAL", na=False, case=False)].dropna(subset=[col_sucursal])
+        # --- FILTRADO DE SEGURIDAD ---
+        # Solo nos quedamos con las sucursales reales. 
+        # Descartamos cualquier fila que diga "TOTAL" o esté vacía.
+        df_sucursales = df[
+            (df[col_sucursal].notna()) & 
+            (~df[col_sucursal].str.contains("TOTAL", na=False, case=False)) &
+            (df[col_sucursal] != "")
+        ].copy()
 
-        # 4. CÁLCULO DE KPIs (Sumando solo los TOTALES de cada marca para no duplicar)
-        # Esto garantiza que el número sea igual al de tu Excel
-        total_n1 = df_totales_marcas[col_n1].sum()
-        total_n2 = df_totales_marcas[col_n2].sum()
-        total_logrado = df_totales_marcas[col_logrado].sum()
-        
+        # 2. CÁLCULO MANUAL (Sin duplicados)
+        total_logrado = df_sucursales[col_logrado].sum()
+        total_n1 = df_sucursales[col_n1].sum()
+        total_n2 = df_sucursales[col_n2].sum()
         cumplimiento = (total_logrado / total_n1 * 100) if total_n1 > 0 else 0
 
-        # --- VISUALIZACIÓN ---
-        st.subheader("📌 Totales Consolidados (Igual al Excel)")
+        # --- DISEÑO DEL PANEL ---
+        st.subheader("📌 Totales Reales (Suma de Sucursales)")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Logrado Total", f"{int(total_logrado)}")
         c2.metric("Objetivo Nivel 1", f"{int(total_n1)}")
@@ -45,29 +46,29 @@ if uploaded_file:
 
         st.divider()
 
-        # 5. GRÁFICOS (Usando solo datos de sucursales para que las barras sean correctas)
-        col_a, col_b = st.columns(2)
+        # 3. GRÁFICOS
+        col_izq, col_der = st.columns(2)
 
-        with col_a:
-            st.write("### 🏢 Logro por Sucursal")
+        with col_izq:
+            st.write("### 🏢 Rendimiento por Sucursal")
             fig_bar = px.bar(df_sucursales, x=col_sucursal, y=[col_logrado, col_n1],
                              barmode='group', labels={'value': 'Unidades', 'variable': 'Tipo'},
-                             color_discrete_sequence=["#1f77b4", "#ff7f0e"])
+                             color_discrete_sequence=["#0088FE", "#FFBB28"])
             st.plotly_chart(fig_bar, use_container_width=True)
 
-        with col_b:
-            st.write("### 📈 % de Avance Individual")
+        with col_der:
+            st.write("### 📈 Porcentaje de Avance")
             df_sucursales['%'] = (df_sucursales[col_logrado] / df_sucursales[col_n1] * 100)
             fig_rank = px.bar(df_sucursales.sort_values('%'), x='%', y=col_sucursal, 
                               orientation='h', color='%', color_continuous_scale="RdYlGn")
             st.plotly_chart(fig_rank, use_container_width=True)
 
-        # 6. TABLA DE VERIFICACIÓN
-        with st.expander("Ver detalle de datos procesados"):
-            st.write("Datos de sucursales detectados:")
+        # 4. TABLA DE AUDITORÍA (Para que verifiques fila por fila)
+        with st.expander("🔍 Ver desglose de sucursales sumadas"):
+            st.write("El sistema solo está sumando estas filas para evitar duplicar totales:")
             st.table(df_sucursales[[col_sucursal, col_logrado, col_n1, col_n2]])
 
     except Exception as e:
-        st.error(f"Error técnico: {e}")
+        st.error(f"Error al procesar el archivo: {e}")
 else:
-    st.info("👋 Esperando archivo Excel para procesar totales...")
+    st.info("Sube el archivo Excel para ver los datos correctos.")
