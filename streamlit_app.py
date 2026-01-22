@@ -1,94 +1,83 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from io import BytesIO
 
-# Configuración de la página
-st.set_page_config(page_title="Dashboard de Ventas Pro", layout="wide")
+st.set_page_config(page_title="Panel de Ventas Preciso", layout="wide")
 
-st.title("🚀 Panel de Control de Objetivos")
-st.markdown("Sube tu Excel diario para actualizar los gráficos y descargar reportes.")
+st.title("📊 Control de Objetivos - Datos Verificados")
 
-# 1. CARGA DE ARCHIVO
-uploaded_file = st.file_uploader("Arrastra tu archivo Excel aquí", type=["xlsx"])
+uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
 
 if uploaded_file:
     try:
-        # Procesamiento y Limpieza
+        # 1. Leer y limpiar básico
         df = pd.read_excel(uploaded_file)
         df.columns = [str(c).strip() for c in df.columns]
-        df.iloc[:, 0] = df.iloc[:, 0].ffill() 
         
-        # Identificación de columnas por posición
+        # Rellenar la columna de Empresa (columna 0)
+        df.iloc[:, 0] = df.iloc[:, 0].ffill()
+        
+        # Nombres de columnas por posición para evitar errores de fecha
         col_empresa = df.columns[0]
         col_sucursal = df.columns[1]
         col_n1 = df.columns[2]
         col_n2 = df.columns[3]
         col_logrado = df.columns[4]
 
-        # Filtrar sucursales reales (quitar totales)
-        df_sucursales = df[~df[col_sucursal].str.contains("TOTAL", na=False, case=False)].dropna(subset=[col_sucursal])
-
-        # 2. BARRA LATERAL (Filtros y Exportación)
-        st.sidebar.header("⚙️ Configuración")
-        empresas = df_sucursales[col_empresa].unique()
-        seleccion = st.sidebar.multiselect("Filtrar Empresas:", empresas, default=list(empresas))
+        # --- LÓGICA DE FILTRADO PRECISA ---
+        # 2. Separar Sucursales de Totales
+        # Filtramos filas que contienen "TOTAL" (mayúsculas o minúsculas)
+        es_fila_total = df[col_sucursal].str.contains("TOTAL", na=False, case=False)
         
-        df_filtrado = df_sucursales[df_sucursales[col_empresa].isin(seleccion)]
+        df_sucursales = df[~es_fila_total].dropna(subset=[col_sucursal])
+        df_totales = df[es_fila_total]
 
-        # Botón de Descarga de Datos Filtrados
-        st.sidebar.divider()
-        st.sidebar.subheader("📥 Exportar")
+        # 3. CÁLCULO DE TOTALES (Usando las filas TOTAL del Excel para máxima precisión)
+        # Sumamos solo las filas que dicen "TOTAL" por marca para el KPI global
+        total_logrado_real = df_sucursales[col_logrado].sum()
+        total_n1_real = df_sucursales[col_n1].sum()
+        total_n2_real = df_sucursales[col_n2].sum()
         
-        def to_excel(df_to_download):
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_to_download.to_excel(writer, index=False, sheet_name='Reporte')
-            return output.getvalue()
+        cumplimiento_global = (total_logrado_real / total_n1_real) * 100 if total_n1_real > 0 else 0
 
-        excel_data = to_excel(df_filtrado)
-        st.sidebar.download_button(
-            label="Descargar Reporte en Excel",
-            data=excel_data,
-            file_name=f'reporte_objetivos.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-
-        # 3. CUADRO DE MANDO (KPIs)
-        t_logrado = df_filtrado[col_logrado].sum()
-        t_n1 = df_filtrado[col_n1].sum()
-        progreso = (t_logrado / t_n1 * 100) if t_n1 > 0 else 0
-
-        st.subheader("📌 Resumen General de Selección")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Unidades Logradas", f"{t_logrado}")
-        c2.metric("Meta Nivel 1", f"{t_n1}")
-        c3.metric("% Cumplimiento", f"{progreso:.1f}%", delta=f"{progreso-100:.1f}% vs Meta")
+        # --- INTERFAZ ---
+        st.subheader("📈 Resumen Consolidado Real")
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Logrado (Suma Sucursales)", f"{int(total_logrado_real)}")
+        k2.metric("Objetivo Nivel 1", f"{int(total_n1_real)}")
+        k3.metric("Objetivo Nivel 2", f"{int(total_n2_real)}")
+        k4.metric("% Cumplimiento Total", f"{cumplimiento_global:.1f}%")
 
         st.divider()
 
-        # 4. GRÁFICOS DIDÁCTICOS
-        col_a, col_b = st.columns(2)
+        # 4. GRÁFICOS (Solo con datos de sucursales, sin totales que distorsionen)
+        col_izq, col_der = st.columns(2)
 
-        with col_a:
-            st.write("### 📊 Comparativa de Niveles por Sucursal")
-            fig_bar = px.bar(df_filtrado, x=col_sucursal, y=[col_logrado, col_n1, col_n2],
-                             barmode='group', color_discrete_sequence=["#1f77b4", "#ff7f0e", "#2ca02c"])
+        with col_izq:
+            st.write("### 🏢 Comparativa por Sucursal")
+            fig_bar = px.bar(df_sucursales, 
+                             x=col_sucursal, 
+                             y=[col_logrado, col_n1],
+                             barmode='group',
+                             title="Logrado vs Nivel 1",
+                             color_discrete_sequence=["#007bff", "#ffc107"])
             st.plotly_chart(fig_bar, use_container_width=True)
 
-        with col_b:
-            st.write("### 🎯 Ranking de Cumplimiento (%)")
-            df_filtrado['perc'] = (df_filtrado[col_logrado] / df_filtrado[col_n1] * 100)
-            fig_rank = px.bar(df_filtrado.sort_values('perc'), x='perc', y=col_sucursal, 
-                              orientation='h', color='perc', color_continuous_scale="RdYlGn")
-            st.plotly_chart(fig_rank, use_container_width=True)
+        with col_der:
+            st.write("### 🏆 Top Cumplimiento (%)")
+            df_sucursales['%_logro'] = (df_sucursales[col_logrado] / df_sucursales[col_n1]) * 100
+            fig_ranking = px.bar(df_sucursales.sort_values('%_logro'), 
+                                 x='%_logro', y=col_sucursal, 
+                                 orientation='h',
+                                 color='%_logro',
+                                 color_continuous_scale="RdYlGn")
+            st.plotly_chart(fig_ranking, use_container_width=True)
 
-        # 5. TABLA DE DATOS FINAL
-        st.subheader("📝 Detalle de Sucursales")
-        st.dataframe(df_filtrado.style.background_gradient(cmap='YlGn', subset=[df.columns[5]]), use_container_width=True)
+        # 5. TABLA DE CONTROL (Muestra los datos tal cual el Excel para auditar)
+        st.subheader("🔍 Auditoría de Datos (Planilla Filtrada)")
+        st.dataframe(df_sucursales[[col_empresa, col_sucursal, col_logrado, col_n1, col_n2]], use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error: Asegúrate de que el Excel tenga el formato correcto. Detalles: {e}")
+        st.error(f"Error al procesar los datos: {e}")
 else:
-    st.info("👋 Por favor, sube el archivo Excel para activar el panel.")
+    st.info("Sube el archivo para verificar los totales.")
