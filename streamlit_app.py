@@ -3,75 +3,65 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
-st.set_page_config(page_title="Dashboard de Objetivos", layout="wide")
+st.set_page_config(page_title="Panel de Objetivos", layout="wide")
 
-st.title("📊 Monitor de Objetivos: Nivel 1 vs Nivel 2")
+st.title("📊 Monitor de Objetivos")
 
 uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
 
 if uploaded_file:
-    # 1. Limpieza de datos (específica para tu formato)
-    df = pd.read_excel(uploaded_file)
-    df.columns = [c.strip() for c in df.columns]
-    df.iloc[:, 0] = df.iloc[:, 0].ffill() # Rellenar nombres de empresas
-    
-    empresa_col = df.columns[0]
-    sucursal_col = df.columns[1]
-    
-    # Separamos los Totales de las Sucursales
-    df_sucursales = df[~df[sucursal_col].str.contains("TOTAL", na=False)].copy()
-    df_totales = df[df[sucursal_col].str.contains("TOTAL", na=False)].copy()
+    try:
+        # Leer Excel
+        df = pd.read_excel(uploaded_file)
+        
+        # 1. Limpieza Automática
+        df.columns = [str(c).strip() for c in df.columns]
+        df.iloc[:, 0] = df.iloc[:, 0].ffill() 
+        
+        # Identificar columnas por posición para que no falle con las fechas
+        # Col 0: Empresa, Col 1: Sucursal, Col 2: Nivel 1, Col 3: Nivel 2, Col 4: Logrado
+        col_empresa = df.columns[0]
+        col_sucursal = df.columns[1]
+        col_n1 = df.columns[2]
+        col_n2 = df.columns[3]
+        col_logrado = df.columns[4]
 
-    # 2. Selector de Sucursal para el Termómetro
-    st.sidebar.header("Filtros")
-    sucursal_seleccionada = st.sidebar.selectbox("Selecciona una Sucursal para ver detalle:", df_sucursales[sucursal_col].unique())
-    
-    datos_suc = df_sucursales[df_sucursales[sucursal_col] == sucursal_seleccionada].iloc[0]
+        # Filtrar filas vacías o totales
+        df_clean = df.dropna(subset=[col_sucursal]).copy()
+        df_sucursales = df_clean[~df_clean[col_sucursal].str.contains("TOTAL", na=False)].copy()
 
-    # 3. Visualización de Termómetro (Gauge Chart)
-    st.subheader(f"Estado de cumplimiento: {sucursal_seleccionada}")
-    
-    fig_gauge = go.Figure(go.Indicator(
-        mode = "gauge+number+delta",
-        value = datos_suc['Logrado h/21/01'],
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "Progreso hacia Nivel 2", 'font': {'size': 24}},
-        delta = {'reference': datos_suc['Nivel 1'], 'position': "top", 'relative': False},
-        gauge = {
-            'axis': {'range': [None, datos_suc['Nivel 2']], 'tickwidth': 1},
-            'bar': {'color': "#1f77b4"},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': [
-                {'range': [0, datos_suc['Nivel 1']], 'color': '#ffcfcf'}, # Rojo hasta Nivel 1
-                {'range': [datos_suc['Nivel 1'], datos_suc['Nivel 2']], 'color': '#e1ffcf'}], # Verde hasta Nivel 2
-            'threshold': {
-                'line': {'color': "black", 'width': 4},
-                'thickness': 0.75,
-                'value': datos_suc['Nivel 1']}}))
+        # 2. Sidebar
+        st.sidebar.header("Configuración")
+        sucursal = st.sidebar.selectbox("Selecciona Sucursal:", df_sucursales[col_sucursal].unique())
+        datos_suc = df_sucursales[df_sucursales[col_sucursal] == sucursal].iloc[0]
 
-    st.plotly_chart(fig_gauge, use_container_width=True)
+        # 3. Gráfico de Termómetro (Gauge)
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = datos_suc[col_logrado],
+            title = {'text': f"Progreso: {sucursal}"},
+            delta = {'reference': datos_suc[col_n1]},
+            gauge = {
+                'axis': {'range': [0, datos_suc[col_n2]]},
+                'steps': [
+                    {'range': [0, datos_suc[col_n1]], 'color': "lightcoral"},
+                    {'range': [datos_suc[col_n1], datos_suc[col_n2]], 'color': "lightgreen"}
+                ],
+                'threshold': {
+                    'line': {'color': "black", 'width': 4},
+                    'thickness': 0.75,
+                    'value': datos_suc[col_n1]
+                }
+            }
+        ))
+        st.plotly_chart(fig, use_container_width=True)
 
-    # 4. Comparativa General
-    st.divider()
-    st.subheader("Comparativo por Concesionarios")
-    
-    # Gráfico de barras comparando niveles
-    fig_comp = px.bar(df_sucursales, 
-                     x=sucursal_col, 
-                     y=['Logrado h/21/01', 'Nivel 1', 'Nivel 2'],
-                     barmode='group',
-                     color_discrete_map={
-                         'Logrado h/21/01': '#1f77b4',
-                         'Nivel 1': '#ff7f0e',
-                         'Nivel 2': '#2ca02c'
-                     })
-    st.plotly_chart(fig_comp, use_container_width=True)
+        # 4. Tabla de Resumen
+        st.subheader("Estado General")
+        st.table(df_sucursales[[col_empresa, col_sucursal, col_logrado, col_n1, col_n2]])
 
-    # 5. Tabla con formato de colores
-    st.subheader("Planilla Detallada")
-    st.dataframe(df_sucursales.style.background_gradient(subset=['% logrado del Nivel 1'], cmap='RdYlGn'))
-
+    except Exception as e:
+        st.error(f"Hubo un problema al leer el archivo: {e}")
+        st.info("Asegúrate de que el Excel tenga las columnas: Empresa, Sucursal, Nivel 1, Nivel 2, Logrado.")
 else:
-    st.info("👋 Por favor, sube el archivo Excel para activar el termómetro de ventas.")
+    st.warning("Esperando archivo Excel...")
