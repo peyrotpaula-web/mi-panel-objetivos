@@ -7,15 +7,9 @@ from io import BytesIO
 # 1. CONFIGURACIÓN Y ESTILO
 st.set_page_config(page_title="Dashboard Objetivos", layout="wide")
 
-# Diccionario de colores corporativos
 COLORES_MARCAS = {
-    "PAMPAWAGEN": "#001E50",  # Azul VW
-    "FORTECAR": "#102C54",    # Azul Ford
-    "GRANVILLE": "#FFCE00",   # Amarillo Fiat
-    "CITROEN SN": "#E20613",  # Rojo Citroen
-    "OPENCARS": "#00A1DF",    # Celeste Opencars
-    "RED SECUNDARIA": "#4B4B4B", 
-    "OTRAS": "#999999"
+    "PAMPAWAGEN": "#001E50", "FORTECAR": "#102C54", "GRANVILLE": "#FFCE00",
+    "CITROEN SN": "#E20613", "OPENCARS": "#00A1DF", "RED SECUNDARIA": "#4B4B4B", "OTRAS": "#999999"
 }
 
 st.markdown("""
@@ -64,9 +58,13 @@ if uploaded_file:
         df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
         df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
         
-        # Cálculo de Faltante N1
-        df_final['Faltante N1'] = df_final[col_n1] - df_final[col_log]
-        df_final['Faltante N1'] = df_final['Faltante N1'].apply(lambda x: f"{int(x)} un." if x > 0 else "✅ Logrado")
+        # Cálculo de Faltantes N1 y N2
+        def calc_faltante(logrado, objetivo):
+            diff = objetivo - logrado
+            return f"{int(diff)} un." if diff > 0 else "✅ Logrado"
+
+        df_final['Faltante N1'] = df_final.apply(lambda x: calc_faltante(x[col_log], x[col_n1]), axis=1)
+        df_final['Faltante N2'] = df_final.apply(lambda x: calc_faltante(x[col_log], x[col_n2]), axis=1)
 
         # --- DASHBOARD ---
         st.subheader(f"📍 Resumen de Gestión: {marca_sel}")
@@ -77,33 +75,27 @@ if uploaded_file:
         c1.metric("Logrado Total", f"{int(t_log)}")
         c2.metric("Objetivo N1", f"{int(t_n1)}")
         c3.metric("Objetivo N2", f"{int(t_n2)}")
-        c4.metric("% Cumplimiento", f"{cumpl_global}%")
+        c4.metric("% Global (N1)", f"{cumpl_global}%")
 
         st.divider()
 
-        # Gráfico de Barras con Línea de Promedio
+        # Gráfico de Barras (Sin línea roja)
         st.write("### 🏢 Rendimiento por Sucursal")
         fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
                          color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
-        
-        # Agregar línea de promedio (basada en el % pero escalada a unidades para visualización)
-        promedio_unidades = df_final[col_log].mean()
-        fig_bar.add_hline(y=promedio_unidades, line_dash="dash", line_color="red", 
-                          annotation_text=f"Promedio Logrado: {int(promedio_unidades)}", annotation_position="top left")
-        
         fig_bar.update_traces(textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
 
         # Ranking de Marcas (Solo si es Grupo Total)
         if marca_sel == "GRUPO TOTAL":
-            st.write("### 🏆 Ranking de Cumplimiento por Marca")
+            st.write("### 🏆 Ranking de Cumplimiento por Marca (Objetivo Nivel 1)")
             ranking = df_final.groupby('Marca').agg({col_log: 'sum', col_n1: 'sum'}).reset_index()
-            ranking['%'] = (ranking[col_log] / ranking[col_n1] * 100).round(1)
-            ranking = ranking.sort_values('%', ascending=False)
+            ranking['%'] = (ranking[col_log] / ranking[col_n1] * 100).round(0).astype(int)
+            ranking['text_label'] = ranking['%'].astype(str) + "%"
             
-            fig_rank = px.bar(ranking, x='%', y='Marca', orientation='h', text='%',
+            fig_rank = px.bar(ranking, x='%', y='Marca', orientation='h', text='text_label',
                               color='Marca', color_discrete_map=COLORES_MARCAS)
-            fig_rank.update_layout(showlegend=False)
+            fig_rank.update_layout(showlegend=False, xaxis_title="Porcentaje de Cumplimiento")
             st.plotly_chart(fig_rank, use_container_width=True, config={'staticPlot': True})
 
         # Termómetro
@@ -118,16 +110,18 @@ if uploaded_file:
 
         st.divider()
 
-        # Matriz con columna "Faltante N1"
-        st.write("### 🏆 Matriz de Cumplimiento (Con Faltantes N1)")
+        # Matriz con Faltante N1 y N2
+        st.write("### 🏆 Matriz de Cumplimiento (Faltantes N1 y N2)")
         col_l, col_a = st.columns(2)
+        cols_mostrar = [col_obj, '%_txt', 'Faltante N1', 'Faltante N2']
+        
         with col_l:
             st.success("✨ Líderes (>= 80%)")
-            df_l = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[[col_obj, '%_txt', 'Faltante N1']]
+            df_l = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[cols_mostrar]
             st.table(df_l.set_index(col_obj))
         with col_a:
             st.error("⚠️ Alerta (< 80%)")
-            df_a = df_final[df_final['%_int'] < 80].sort_values('%_int')[[col_obj, '%_txt', 'Faltante N1']]
+            df_a = df_final[df_final['%_int'] < 80].sort_values('%_int')[cols_mostrar]
             st.table(df_a.set_index(col_obj))
 
         st.divider()
