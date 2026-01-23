@@ -58,7 +58,7 @@ if uploaded_file:
         df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
         df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
         
-        # Cálculo de Faltantes N1 y N2
+        # Cálculo de Faltantes
         def calc_faltante(logrado, objetivo):
             diff = objetivo - logrado
             return f"{int(diff)} un." if diff > 0 else "✅ Logrado"
@@ -79,19 +79,22 @@ if uploaded_file:
 
         st.divider()
 
-        # Gráfico de Barras (Sin línea roja)
+        # Gráfico de Barras Sucursales
         st.write("### 🏢 Rendimiento por Sucursal")
         fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
                          color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
         fig_bar.update_traces(textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
 
-        # Ranking de Marcas (Solo si es Grupo Total)
+        # Ranking de Marcas (Ordenado de Mayor a Menor)
         if marca_sel == "GRUPO TOTAL":
             st.write("### 🏆 Ranking de Cumplimiento por Marca (Objetivo Nivel 1)")
             ranking = df_final.groupby('Marca').agg({col_log: 'sum', col_n1: 'sum'}).reset_index()
             ranking['%'] = (ranking[col_log] / ranking[col_n1] * 100).round(0).astype(int)
             ranking['text_label'] = ranking['%'].astype(str) + "%"
+            
+            # ORDENAR DE MAYOR A MENOR
+            ranking = ranking.sort_values('%', ascending=True) # Ascending True porque Plotly invierte el orden en barras horizontales
             
             fig_rank = px.bar(ranking, x='%', y='Marca', orientation='h', text='text_label',
                               color='Marca', color_discrete_map=COLORES_MARCAS)
@@ -110,7 +113,7 @@ if uploaded_file:
 
         st.divider()
 
-        # Matriz con Faltante N1 y N2
+        # Matriz
         st.write("### 🏆 Matriz de Cumplimiento (Faltantes N1 y N2)")
         col_l, col_a = st.columns(2)
         cols_mostrar = [col_obj, '%_txt', 'Faltante N1', 'Faltante N2']
