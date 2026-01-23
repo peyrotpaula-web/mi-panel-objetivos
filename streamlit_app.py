@@ -4,23 +4,46 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
 
-# Configuración de página
+# 1. CONFIGURACIÓN Y ESTILO PARA PDF
 st.set_page_config(page_title="Dashboard Objetivos", layout="wide")
 
-# TÍTULO ACTUALIZADO
+# Este bloque de código hace que al imprimir (PDF), el panel se vea perfecto
+st.markdown("""
+    <style>
+    @media print {
+        .stButton, .stFileUploader, .stSidebar, header {
+            display: none !important;
+        }
+        .main .block-container {
+            padding-top: 0rem !important;
+            padding-bottom: 0rem !important;
+        }
+        .element-container, .stPlotlyChart {
+            page-break-inside: avoid !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# TÍTULO
 st.title("📊 Panel de Control de Objetivo Sucursales")
-st.markdown("_Para exportar a **PDF**: Presiona **Ctrl + P** (Windows) o **Cmd + P** (Mac) y selecciona 'Guardar como PDF'_")
+
+# BOTÓN DE IMPRESIÓN PDF EN LA BARRA PRINCIPAL
+col_pdf, _ = st.columns([1, 4])
+with col_pdf:
+    if st.button("📑 Generar Reporte PDF (Pantalla Completa)"):
+        st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+        st.info("💡 Si no se abre solo, presiona Ctrl+P (Windows) o Cmd+P (Mac)")
 
 uploaded_file = st.file_uploader("Sube el archivo Excel", type=["xlsx"])
 
 if uploaded_file:
     try:
-        # 1. PROCESAMIENTO
+        # 2. PROCESAMIENTO
         df = pd.read_excel(uploaded_file)
         df.columns = [str(c).strip() for c in df.columns]
         col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
 
-        # Lógica de asignación de Marcas
         df['Marca'] = None
         marca_actual = "OTRAS"
         for i, row in df.iterrows():
@@ -33,37 +56,21 @@ if uploaded_file:
             elif "RED" in texto: marca_actual = "RED SECUNDARIA"
             df.at[i, 'Marca'] = marca_actual
 
-        # Filtrar sucursales (quitar filas de TOTAL)
         df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].copy()
         df_suc = df_suc.dropna(subset=[col_n1])
         
-        # Filtro por Marca en barra lateral
-        st.sidebar.header("🔍 Filtros de Visualización")
+        st.sidebar.header("🔍 Filtros")
         opciones_marcas = ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist())
         marca_seleccionada = st.sidebar.selectbox("Seleccionar Empresa:", opciones_marcas)
 
-        if marca_seleccionada != "GRUPO TOTAL":
-            df_final = df_suc[df_suc['Marca'] == marca_seleccionada].copy()
-        else:
-            df_final = df_suc.copy()
-
-        # Cálculos de porcentajes
+        df_final = df_suc if marca_seleccionada == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_seleccionada].copy()
         df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
         df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
 
-        # 2. KPIs GLOBALES
+        # 3. KPIs
         t_log, t_n1, t_n2 = df_final[col_log].sum(), df_final[col_n1].sum(), df_final[col_n2].sum()
         cumpl_global = int((t_log/t_n1)*100) if t_n1 > 0 else 0
 
-        # Botón Excel en Sidebar
-        st.sidebar.divider()
-        st.sidebar.subheader("📥 Descargas")
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_final[[col_obj, col_log, col_n1, col_n2, '%_txt', 'Marca']].to_excel(writer, index=False)
-        st.sidebar.download_button("Descargar Selección (Excel)", data=output.getvalue(), file_name=f"reporte_{marca_seleccionada}.xlsx")
-
-        # 3. INTERFAZ VISUAL (KPIs)
         st.subheader(f"📍 Resumen: {marca_seleccionada}")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Logrado", f"{int(t_log)} un.")
@@ -78,54 +85,40 @@ if uploaded_file:
         with col_bar:
             st.write("### 🏢 Unidades por Sucursal")
             fig_suc = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
-                             color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"],
-                             labels={'value': 'Unidades', 'variable': 'Referencia'})
+                             color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"])
             st.plotly_chart(fig_suc, use_container_width=True)
 
         with col_marca:
-            st.write("### 🌡️ Termómetro de Avance")
+            st.write("### 🌡️ Avance Global")
             fig_gauge = go.Figure(go.Indicator(
-                mode = "gauge+number", value = cumpl_global,
-                number = {'suffix': "%"},
+                mode = "gauge+number", value = cumpl_global, number = {'suffix': "%"},
                 gauge = {'axis': {'range': [0, 120]}, 'bar': {'color': "#323232"},
                          'steps': [{'range': [0, 80], 'color': "#FF4B4B"},
                                    {'range': [80, 100], 'color': "#F9D71C"},
                                    {'range': [100, 120], 'color': "#00CC96"}]}))
-            fig_gauge.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
+            fig_gauge.update_layout(height=280)
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-        # 5. MATRIZ TOP/BOTTOM
+        # 5. MATRICES
         st.divider()
-        st.write(f"### 🏆 Matriz de Rendimiento: {marca_seleccionada}")
+        st.write("### 🏆 Matriz de Rendimiento")
         col_l, col_a = st.columns(2)
         with col_l:
             st.success("✨ Líderes (>= 80%)")
             df_lideres = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[[col_obj, '%_txt']]
-            df_lideres.columns = ["Sucursal", "Cumplimiento"]
             st.table(df_lideres.assign(blank='').set_index('blank'))
         with col_a:
             st.error("⚠️ Alerta (< 80%)")
             df_alerta = df_final[df_final['%_int'] < 80].sort_values('%_int')[[col_obj, '%_txt']]
-            df_alerta.columns = ["Sucursal", "Cumplimiento"]
             st.table(df_alerta.assign(blank='').set_index('blank'))
 
-        # 6. HEATMAP ORDENADO
+        # 6. SEMÁFORO
         st.divider()
-        st.write("### 🚥 Semáforo Visual (Ordenado por Cumplimiento)")
-        # ORDENADO DE MAYOR A MENOR PARA MEJOR LECTURA
+        st.write("### 🚥 Semáforo Visual")
         df_heat = df_final.sort_values('%_int', ascending=False)
-        
-        fig_heat = px.imshow([df_heat['%_int'].values], 
-                             x=df_heat[col_obj], 
-                             color_continuous_scale="RdYlGn", 
-                             text_auto=True,
-                             aspect="auto")
-        
+        fig_heat = px.imshow([df_heat['%_int'].values], x=df_heat[col_obj], color_continuous_scale="RdYlGn", text_auto=True)
         fig_heat.update_traces(texttemplate="%{z}%")
-        fig_heat.update_xaxes(side="top")
         st.plotly_chart(fig_heat, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error en el procesamiento: {e}")
-else:
-    st.info("👋 Sube el archivo Excel para visualizar el panel.")
+        st.error(f"Error: {e}")
