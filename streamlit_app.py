@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
 
-# 1. CONFIGURACIÓN DE PÁGINA Y ESTILO PDF
+# 1. CONFIGURACIÓN DE PÁGINA Y ESTILO PDF ANTI-ENCIMAMIENTO
 st.set_page_config(page_title="Dashboard Objetivos", layout="wide")
 
 st.markdown("""
@@ -17,22 +17,26 @@ st.markdown("""
             padding-top: 1rem !important;
             max-width: 100% !important;
         }
-        .stPlotlyChart {
+        /* Forzar espacio entre elementos para que no se encimen */
+        .element-container {
+            margin-bottom: 2rem !important;
             page-break-inside: avoid !important;
+        }
+        .stPlotlyChart {
             visibility: visible !important;
+            display: block !important;
         }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# TÍTULO CORREGIDO
 st.title("📊 Panel de Control de Objetivos Sucursales")
 
 uploaded_file = st.file_uploader("Sube el archivo Excel", type=["xlsx"])
 
 if uploaded_file:
     try:
-        # 2. PROCESAMIENTO DE DATOS
+        # 2. PROCESAMIENTO
         df = pd.read_excel(uploaded_file)
         df.columns = [str(c).strip() for c in df.columns]
         col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
@@ -52,7 +56,6 @@ if uploaded_file:
         df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].copy()
         df_suc = df_suc.dropna(subset=[col_n1])
         
-        # Filtro por Marca
         st.sidebar.header("🔍 Filtros")
         opciones_marcas = ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist())
         marca_sel = st.sidebar.selectbox("Seleccionar Empresa:", opciones_marcas)
@@ -63,52 +66,46 @@ if uploaded_file:
 
         # --- ORDEN SOLICITADO ---
 
-        # A. TARJETAS DE CUMPLIMIENTO (KPIs)
+        # 1. TARJETAS DE CUMPLIMIENTO
         st.subheader(f"📍 Resumen: {marca_sel}")
         t_log, t_n1, t_n2 = df_final[col_log].sum(), df_final[col_n1].sum(), df_final[col_n2].sum()
         cumpl_global = int((t_log/t_n1)*100) if t_n1 > 0 else 0
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Logrado Total", f"{int(t_log)} un.")
-        c2.metric("Objetivo N1", f"{int(t_n1)} un.")
-        c3.metric("Objetivo N2", f"{int(t_n2)} un.")
-        c4.metric("% Cumplimiento", f"{cumpl_global}%")
+        c1.metric("Logrado Total", f"{int(t_log)}")
+        c2.metric("Objetivo N1", f"{int(t_n1)}")
+        c3.metric("Objetivo N2", f"{int(t_n2)}")
+        c4.metric("% Global", f"{cumpl_global}%")
 
         st.divider()
 
-        # B. RENDIMIENTO POR SUCURSAL Y AVANCE GLOBAL
-        col_graf_bar, col_graf_gauge = st.columns([2, 1])
-        
-        with col_graf_bar:
-            st.write("### 🏢 Rendimiento por Sucursal")
-            fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
-                             color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"])
-            # staticPlot=True permite que el navegador vea el gráfico al imprimir
-            st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
+        # 2. RENDIMIENTO POR SUCURSAL
+        st.write("### 🏢 Rendimiento por Sucursal")
+        fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
+                         color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"])
+        st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
 
-        with col_graf_gauge:
-            st.write("### 🌡️ Avance Global")
-            fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=cumpl_global, number={'suffix': "%"},
-                                               gauge={'axis': {'range': [0, 120]}, 'bar': {'color': "#323232"},
-                                                      'steps': [{'range': [0, 80], 'color': "#FF4B4B"},
-                                                                {'range': [80, 100], 'color': "#F9D71C"},
-                                                                {'range': [100, 120], 'color': "#00CC96"}]}))
-            fig_gauge.update_layout(height=300, margin=dict(l=30, r=30, t=50, b=20))
-            st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
+        # 3. AVANCE GLOBAL (Termómetro)
+        st.write("### 🌡️ Avance Global")
+        fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=cumpl_global, number={'suffix': "%"},
+                                           gauge={'axis': {'range': [0, 120]}, 'bar': {'color': "#323232"},
+                                                  'steps': [{'range': [0, 80], 'color': "#FF4B4B"},
+                                                            {'range': [80, 100], 'color': "#F9D71C"},
+                                                            {'range': [100, 120], 'color': "#00CC96"}]}))
+        fig_gauge.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=50))
+        st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
 
         st.divider()
 
-        # C. LÍDERES Y ALERTAS
+        # 4. MATRIZ LÍDERES Y ALERTAS (Tablas separadas para evitar encimamiento)
         st.write("### 🏆 Matriz de Cumplimiento")
-        col_lider, col_alerta = st.columns(2)
-        
-        with col_lider:
+        col_l, col_a = st.columns(2)
+        with col_l:
             st.success("✨ Líderes (>= 80%)")
             df_l = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[[col_obj, '%_txt']]
             df_l.columns = ["Sucursal", "Cumplimiento"]
             st.table(df_l.assign(blank='').set_index('blank'))
-            
-        with col_alerta:
+        with col_a:
             st.error("⚠️ Alerta (< 80%)")
             df_a = df_final[df_final['%_int'] < 80].sort_values('%_int')[[col_obj, '%_txt']]
             df_a.columns = ["Sucursal", "Cumplimiento"]
@@ -116,14 +113,14 @@ if uploaded_file:
 
         st.divider()
 
-        # D. SEMÁFORO DE CUMPLIMIENTO
+        # 5. SEMÁFORO DE CUMPLIMIENTO
         st.write("### 🚥 Semáforo de Cumplimiento")
         df_heat = df_final.sort_values('%_int', ascending=False)
         fig_heat = px.imshow([df_heat['%_int'].values], x=df_heat[col_obj], color_continuous_scale="RdYlGn", text_auto=True)
         fig_heat.update_traces(texttemplate="%{z}%")
         st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
 
-        # BOTÓN DE IMPRESIÓN (Disparador)
+        # BOTÓN DE IMPRESIÓN
         st.write("---")
         if st.button("📄 GENERAR REPORTE PDF"):
             st.components.v1.html("<script>window.parent.print();</script>", height=0)
