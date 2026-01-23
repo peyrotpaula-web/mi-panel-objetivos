@@ -5,9 +5,10 @@ import plotly.graph_objects as go
 from io import BytesIO
 
 # Configuración de página
-st.set_page_config(page_title="Dashboard Ejecutivo", layout="wide")
+st.set_page_config(page_title="Dashboard Objetivos", layout="wide")
 
-st.title("📊 Panel de Control Gerencial")
+# TÍTULO ACTUALIZADO
+st.title("📊 Panel de Control de Objetivo Sucursales")
 st.markdown("_Para exportar a **PDF**: Presiona **Ctrl + P** (Windows) o **Cmd + P** (Mac) y selecciona 'Guardar como PDF'_")
 
 uploaded_file = st.file_uploader("Sube el archivo Excel", type=["xlsx"])
@@ -36,12 +37,11 @@ if uploaded_file:
         df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].copy()
         df_suc = df_suc.dropna(subset=[col_n1])
         
-        # 2. FILTRO POR MARCA EN BARRA LATERAL
+        # Filtro por Marca en barra lateral
         st.sidebar.header("🔍 Filtros de Visualización")
         opciones_marcas = ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist())
         marca_seleccionada = st.sidebar.selectbox("Seleccionar Empresa:", opciones_marcas)
 
-        # Aplicar el filtro a los datos
         if marca_seleccionada != "GRUPO TOTAL":
             df_final = df_suc[df_suc['Marca'] == marca_seleccionada].copy()
         else:
@@ -51,7 +51,7 @@ if uploaded_file:
         df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
         df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
 
-        # 3. KPIs GLOBALES (Basados en el filtro)
+        # 2. KPIs GLOBALES
         t_log, t_n1, t_n2 = df_final[col_log].sum(), df_final[col_n1].sum(), df_final[col_n2].sum()
         cumpl_global = int((t_log/t_n1)*100) if t_n1 > 0 else 0
 
@@ -63,7 +63,7 @@ if uploaded_file:
             df_final[[col_obj, col_log, col_n1, col_n2, '%_txt', 'Marca']].to_excel(writer, index=False)
         st.sidebar.download_button("Descargar Selección (Excel)", data=output.getvalue(), file_name=f"reporte_{marca_seleccionada}.xlsx")
 
-        # 4. INTERFAZ VISUAL (KPIs)
+        # 3. INTERFAZ VISUAL (KPIs)
         st.subheader(f"📍 Resumen: {marca_seleccionada}")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Logrado", f"{int(t_log)} un.")
@@ -73,9 +73,8 @@ if uploaded_file:
 
         st.divider()
 
-        # 5. GRÁFICOS PRINCIPALES
+        # 4. GRÁFICOS
         col_bar, col_marca = st.columns([2, 1])
-        
         with col_bar:
             st.write("### 🏢 Unidades por Sucursal")
             fig_suc = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
@@ -95,27 +94,26 @@ if uploaded_file:
             fig_gauge.update_layout(height=280, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-        # 6. MATRIZ TOP/BOTTOM
+        # 5. MATRIZ TOP/BOTTOM
         st.divider()
         st.write(f"### 🏆 Matriz de Rendimiento: {marca_seleccionada}")
         col_l, col_a = st.columns(2)
-        
         with col_l:
             st.success("✨ Líderes (>= 80%)")
             df_lideres = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[[col_obj, '%_txt']]
             df_lideres.columns = ["Sucursal", "Cumplimiento"]
             st.table(df_lideres.assign(blank='').set_index('blank'))
-            
         with col_a:
             st.error("⚠️ Alerta (< 80%)")
             df_alerta = df_final[df_final['%_int'] < 80].sort_values('%_int')[[col_obj, '%_txt']]
             df_alerta.columns = ["Sucursal", "Cumplimiento"]
             st.table(df_alerta.assign(blank='').set_index('blank'))
 
-        # 7. HEATMAP (SEMÁFORO)
+        # 6. HEATMAP ORDENADO
         st.divider()
-        st.write("### 🚥 Semáforo Visual")
-        df_heat = df_final.sort_values('%_int', ascending=True)
+        st.write("### 🚥 Semáforo Visual (Ordenado por Cumplimiento)")
+        # ORDENADO DE MAYOR A MENOR PARA MEJOR LECTURA
+        df_heat = df_final.sort_values('%_int', ascending=False)
         
         fig_heat = px.imshow([df_heat['%_int'].values], 
                              x=df_heat[col_obj], 
@@ -130,4 +128,4 @@ if uploaded_file:
     except Exception as e:
         st.error(f"Error en el procesamiento: {e}")
 else:
-    st.info("👋 Sube el archivo Excel para visualizar el panel de control.")
+    st.info("👋 Sube el archivo Excel para visualizar el panel.")
