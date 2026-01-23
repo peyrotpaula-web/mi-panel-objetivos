@@ -4,28 +4,27 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
 
-# 1. CONFIGURACIÓN DE PÁGINA Y ESTILO PDF ANTI-ENCIMAMIENTO
+# 1. CONFIGURACIÓN Y ESTILO
 st.set_page_config(page_title="Dashboard Objetivos", layout="wide")
+
+# Diccionario de colores corporativos
+COLORES_MARCAS = {
+    "PAMPAWAGEN": "#001E50",  # Azul VW
+    "FORTECAR": "#102C54",    # Azul Ford
+    "GRANVILLE": "#FFCE00",   # Amarillo Fiat
+    "CITROEN SN": "#E20613",  # Rojo Citroen
+    "OPENCARS": "#00A1DF",    # Celeste Opencars
+    "RED SECUNDARIA": "#4B4B4B", 
+    "OTRAS": "#999999"
+}
 
 st.markdown("""
     <style>
     @media print {
-        .stButton, .stFileUploader, .stSidebar, header, footer, [data-testid="stToolbar"] {
-            display: none !important;
-        }
-        .main .block-container {
-            padding-top: 1rem !important;
-            max-width: 100% !important;
-        }
-        /* Forzar espacio entre elementos para que no se encimen */
-        .element-container {
-            margin-bottom: 2rem !important;
-            page-break-inside: avoid !important;
-        }
-        .stPlotlyChart {
-            visibility: visible !important;
-            display: block !important;
-        }
+        .stButton, .stFileUploader, .stSidebar, header, footer, [data-testid="stToolbar"] { display: none !important; }
+        .main .block-container { padding-top: 1rem !important; max-width: 100% !important; }
+        .element-container { margin-bottom: 2rem !important; page-break-inside: avoid !important; }
+        .stPlotlyChart { visibility: visible !important; display: block !important; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -41,7 +40,7 @@ if uploaded_file:
         df.columns = [str(c).strip() for c in df.columns]
         col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
 
-        df['Marca'] = None
+        df['Marca'] = "OTRAS"
         marca_actual = "OTRAS"
         for i, row in df.iterrows():
             texto = str(row[col_obj]).upper()
@@ -56,6 +55,7 @@ if uploaded_file:
         df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].copy()
         df_suc = df_suc.dropna(subset=[col_n1])
         
+        # Filtros
         st.sidebar.header("🔍 Filtros")
         opciones_marcas = ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist())
         marca_sel = st.sidebar.selectbox("Seleccionar Empresa:", opciones_marcas)
@@ -63,11 +63,13 @@ if uploaded_file:
         df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
         df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
         df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
+        
+        # Cálculo de Faltante N1
+        df_final['Faltante N1'] = df_final[col_n1] - df_final[col_log]
+        df_final['Faltante N1'] = df_final['Faltante N1'].apply(lambda x: f"{int(x)} un." if x > 0 else "✅ Logrado")
 
-        # --- ORDEN SOLICITADO ---
-
-        # 1. TARJETAS DE CUMPLIMIENTO
-        st.subheader(f"📍 Resumen: {marca_sel}")
+        # --- DASHBOARD ---
+        st.subheader(f"📍 Resumen de Gestión: {marca_sel}")
         t_log, t_n1, t_n2 = df_final[col_log].sum(), df_final[col_n1].sum(), df_final[col_n2].sum()
         cumpl_global = int((t_log/t_n1)*100) if t_n1 > 0 else 0
 
@@ -75,52 +77,66 @@ if uploaded_file:
         c1.metric("Logrado Total", f"{int(t_log)}")
         c2.metric("Objetivo N1", f"{int(t_n1)}")
         c3.metric("Objetivo N2", f"{int(t_n2)}")
-        c4.metric("% Global", f"{cumpl_global}%")
+        c4.metric("% Cumplimiento", f"{cumpl_global}%")
 
         st.divider()
 
-        # 2. RENDIMIENTO POR SUCURSAL
+        # Gráfico de Barras con Línea de Promedio
         st.write("### 🏢 Rendimiento por Sucursal")
         fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
-                         color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"])
+                         color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
+        
+        # Agregar línea de promedio (basada en el % pero escalada a unidades para visualización)
+        promedio_unidades = df_final[col_log].mean()
+        fig_bar.add_hline(y=promedio_unidades, line_dash="dash", line_color="red", 
+                          annotation_text=f"Promedio Logrado: {int(promedio_unidades)}", annotation_position="top left")
+        
+        fig_bar.update_traces(textposition='outside')
         st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
 
-        # 3. AVANCE GLOBAL (Termómetro)
+        # Ranking de Marcas (Solo si es Grupo Total)
+        if marca_sel == "GRUPO TOTAL":
+            st.write("### 🏆 Ranking de Cumplimiento por Marca")
+            ranking = df_final.groupby('Marca').agg({col_log: 'sum', col_n1: 'sum'}).reset_index()
+            ranking['%'] = (ranking[col_log] / ranking[col_n1] * 100).round(1)
+            ranking = ranking.sort_values('%', ascending=False)
+            
+            fig_rank = px.bar(ranking, x='%', y='Marca', orientation='h', text='%',
+                              color='Marca', color_discrete_map=COLORES_MARCAS)
+            fig_rank.update_layout(showlegend=False)
+            st.plotly_chart(fig_rank, use_container_width=True, config={'staticPlot': True})
+
+        # Termómetro
         st.write("### 🌡️ Avance Global")
         fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=cumpl_global, number={'suffix': "%"},
                                            gauge={'axis': {'range': [0, 120]}, 'bar': {'color': "#323232"},
                                                   'steps': [{'range': [0, 80], 'color': "#FF4B4B"},
                                                             {'range': [80, 100], 'color': "#F9D71C"},
                                                             {'range': [100, 120], 'color': "#00CC96"}]}))
-        fig_gauge.update_layout(height=350, margin=dict(l=30, r=30, t=50, b=50))
+        fig_gauge.update_layout(height=300)
         st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
 
         st.divider()
 
-        # 4. MATRIZ LÍDERES Y ALERTAS (Tablas separadas para evitar encimamiento)
-        st.write("### 🏆 Matriz de Cumplimiento")
+        # Matriz con columna "Faltante N1"
+        st.write("### 🏆 Matriz de Cumplimiento (Con Faltantes N1)")
         col_l, col_a = st.columns(2)
         with col_l:
             st.success("✨ Líderes (>= 80%)")
-            df_l = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[[col_obj, '%_txt']]
-            df_l.columns = ["Sucursal", "Cumplimiento"]
-            st.table(df_l.assign(blank='').set_index('blank'))
+            df_l = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[[col_obj, '%_txt', 'Faltante N1']]
+            st.table(df_l.set_index(col_obj))
         with col_a:
             st.error("⚠️ Alerta (< 80%)")
-            df_a = df_final[df_final['%_int'] < 80].sort_values('%_int')[[col_obj, '%_txt']]
-            df_a.columns = ["Sucursal", "Cumplimiento"]
-            st.table(df_a.assign(blank='').set_index('blank'))
+            df_a = df_final[df_final['%_int'] < 80].sort_values('%_int')[[col_obj, '%_txt', 'Faltante N1']]
+            st.table(df_a.set_index(col_obj))
 
         st.divider()
-
-        # 5. SEMÁFORO DE CUMPLIMIENTO
         st.write("### 🚥 Semáforo de Cumplimiento")
         df_heat = df_final.sort_values('%_int', ascending=False)
         fig_heat = px.imshow([df_heat['%_int'].values], x=df_heat[col_obj], color_continuous_scale="RdYlGn", text_auto=True)
         fig_heat.update_traces(texttemplate="%{z}%")
         st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
 
-        # BOTÓN DE IMPRESIÓN
         st.write("---")
         if st.button("📄 GENERAR REPORTE PDF"):
             st.components.v1.html("<script>window.parent.print();</script>", height=0)
