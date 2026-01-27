@@ -154,7 +154,7 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (CON DESEMPATE POR VO)
+# OPCIÓN 2: RANKING DE ASESORES (SUCURSALES CORREGIDAS)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
@@ -167,18 +167,18 @@ elif pagina == "Ranking de Asesores 🥇":
 
     if u45 and u53:
         try:
-            def cargar_hoja1(file):
+            def cargar_datos_hoja1(file):
                 if file.name.endswith('.csv'):
                     df = pd.read_csv(file)
                 else:
                     xls = pd.ExcelFile(file, engine='xlrd' if file.name.endswith('.xls') else None)
-                    hoja = "Hoja 1" if "Hoja 1" in xls.sheet_names else xls.sheet_names[0]
-                    df = xls.parse(hoja)
-                df = df.loc[:, ~df.columns.duplicated()].copy()
-                return df
+                    # Forzamos Hoja 1
+                    nombre_hoja = "Hoja 1" if "Hoja 1" in xls.sheet_names else xls.sheet_names[0]
+                    df = xls.parse(nombre_hoja)
+                return df.loc[:, ~df.columns.duplicated()].copy()
 
-            df45_raw = cargar_hoja1(u45)
-            df53_raw = cargar_hoja1(u53)
+            df45_raw = cargar_datos_hoja1(u45)
+            df53_raw = cargar_datos_hoja1(u53)
 
             def limpiar_asesor(txt):
                 txt = str(txt).strip().upper()
@@ -187,34 +187,34 @@ elif pagina == "Ranking de Asesores 🥇":
                     return " ".join(partes[1:])
                 return txt
 
-            # --- PROCESAR U45 ---
-            c_v_45 = df45_raw.columns[4]
+            # --- MAPA MAESTRO DE SUCURSALES (Lógica pedida) ---
+            mapa_sucursales = {}
+            
+            # Primero cargamos del U53 (Prioridad)
+            c_v_53 = df53_raw.columns[0] # Columna A
+            c_s_53 = next((c for c in df53_raw.columns if "ORIGEN" in str(c).upper() or "SUCURSAL" in str(c).upper() or "DESC" in str(c).upper()), df53_raw.columns[3])
+            
+            for _, row in df53_raw.iterrows():
+                key = limpiar_asesor(row[c_v_53])
+                mapa_sucursales[key] = str(row[c_s_53]).strip().upper()
+
+            # Luego del U45 si no estaban en el U53
+            c_v_45 = df45_raw.columns[4] # Columna E
+            c_s_45 = next((c for c in df45_raw.columns if "CONCESIONARIO" in str(c).upper() or "SUCURSAL" in str(c).upper()), df45_raw.columns[10])
+            
+            for _, row in df45_raw.iterrows():
+                key = limpiar_asesor(row[c_v_45])
+                if key not in mapa_sucursales:
+                    mapa_sucursales[key] = str(row[c_s_45]).strip().upper()
+
+            # --- PROCESAR VENTAS U45 ---
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), None)
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), None)
-            c_s_45 = next((c for c in df45_raw.columns if "CONCESIONARIO" in str(c).upper() or "SUCURSAL" in str(c).upper()), None)
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
             df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
             df45['ASESOR_KEY'] = df45[c_v_45].apply(limpiar_asesor)
 
-            # --- PROCESAR U53 ---
-            c_v_53 = df53_raw.columns[0]
-            c_s_53 = next((c for c in df53_raw.columns if "ORIGEN" in str(c).upper() or "SUCURSAL" in str(c).upper()), None)
-            c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), None)
-
-            df53 = df53_raw.copy()
-            if c_e_53: df53 = df53[df53[c_e_53] != 'AN']
-            df53['ASESOR_KEY'] = df53[c_v_53].apply(limpiar_asesor)
-
-            # --- MAPA SUCURSALES ---
-            mapa_suc = {}
-            for _, row in df45.iterrows():
-                mapa_suc[row['ASESOR_KEY']] = str(row[c_s_45]).strip().upper()
-            for _, row in df53.iterrows():
-                if row['ASESOR_KEY'] not in mapa_suc:
-                    mapa_suc[row['ASESOR_KEY']] = str(row[c_s_53]).strip().upper()
-
-            # --- CÓMPUTOS ---
             u45_sum = df45.groupby('ASESOR_KEY').apply(lambda x: pd.Series({
                 'VN': (x[c_t_45].isin(['O', 'OP'])).sum(),
                 'VO': (x[c_t_45] == 'O2').sum(),
@@ -223,19 +223,22 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum() if c_vo_45 else 0
             })).reset_index()
 
+            # --- PROCESAR PLANES U53 ---
+            c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), None)
+            df53 = df53_raw.copy()
+            if c_e_53: df53 = df53[df53[c_e_53] != 'AN']
+            df53['ASESOR_KEY'] = df53[c_v_53].apply(limpiar_asesor)
             u53_sum = df53.groupby('ASESOR_KEY').size().reset_index(name='PDA')
 
+            # --- UNIÓN Y DESEMPATE ---
             todo = pd.merge(u45_sum, u53_sum, on='ASESOR_KEY', how='outer').fillna(0)
-            todo['Sucursal'] = todo['ASESOR_KEY'].map(mapa_suc)
+            todo['Sucursal'] = todo['ASESOR_KEY'].map(mapa_sucursales)
             todo['TOTAL'] = todo['VN'] + todo['VO'] + todo['ADJ'] + todo['VE'] + todo['PDA']
             
-            # --- ORDENAMIENTO DE DESEMPATE (Lógica nueva) ---
-            # Ordena por TOTAL (desc) y luego por TOMA_VO (desc)
             res = todo.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
-            
             res.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(res))])
 
-            st.write("### 🏆 Ranking Consolidado (Desempate por Toma VO)")
+            st.write("### 🏆 Ranking Consolidado")
             st.dataframe(res[['Ranking', 'ASESOR_KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'ASESOR_KEY':'Asesor'}), 
                          use_container_width=True, hide_index=True)
 
