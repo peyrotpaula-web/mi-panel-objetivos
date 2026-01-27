@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# 1. CONFIGURACIÓN DE PÁGINA (Debe ser la primera línea)
+# 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
 
 # 2. MENÚ LATERAL DE NAVEGACIÓN
@@ -14,10 +14,9 @@ pagina = st.sidebar.radio("Seleccione el Panel:",
 st.sidebar.divider()
 
 # =========================================================
-# OPCIÓN 1: TU CÓDIGO ORIGINAL DE OBJETIVOS (SIN CAMBIOS)
+# OPCIÓN 1: TU CÓDIGO ORIGINAL DE OBJETIVOS (INTACTO)
 # =========================================================
 if pagina == "Panel de Objetivos Sucursales":
-    # Colores corporativos para el Ranking de Marcas
     COLORES_MARCAS = {
        "PAMPAWAGEN": "#001E50", "FORTECAR": "#102C54", "GRANVILLE": "#FFCE00",
         "CITROEN SN": "#E20613", "OPENCARS": "#00A1DF", "RED SECUNDARIA": "#4B4B4B", "OTRAS": "#999999"
@@ -75,7 +74,6 @@ if pagina == "Panel de Objetivos Sucursales":
             marca_sel = st.sidebar.selectbox("Seleccionar Empresa:", opciones_marcas)
 
             df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
-            
             df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
             df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
             
@@ -149,7 +147,6 @@ if pagina == "Panel de Objetivos Sucursales":
             st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
 
             st.write("---")
-            st.info("💡 Para descargar el reporte: Haz clic abajo y selecciona 'Guardar como PDF'.")
             if st.button("📄 GENERAR REPORTE PDF COMPLETO"):
                 st.components.v1.html("<script>window.parent.print();</script>", height=0)
 
@@ -157,36 +154,48 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (CÓDIGO NUEVO)
+# OPCIÓN 2: RANKING DE ASESORES (AJUSTADO PARA .XLS)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
+    # AHORA ACEPTA .XLS, .XLSX y .CSV
     c1, c2 = st.columns(2)
     with c1:
-        u45 = st.file_uploader("Archivo U45 (Ventas)", type=["xlsx", "csv"], key="u45_key")
+        u45 = st.file_uploader("Archivo U45 (Ventas)", type=["xlsx", "xls", "csv"], key="u45_key")
     with c2:
-        u53 = st.file_uploader("Archivo U53 (Planes)", type=["xlsx", "csv"], key="u53_key")
+        u53 = st.file_uploader("Archivo U53 (Planes)", type=["xlsx", "xls", "csv"], key="u53_key")
 
     if u45 and u53:
         try:
-            # Procesar U45
-            df45 = pd.read_excel(u45) if u45.name.endswith('.xlsx') else pd.read_csv(u45)
+            # Procesar U45 con soporte para formatos antiguos
+            if u45.name.endswith('.csv'):
+                df45 = pd.read_csv(u45)
+            else:
+                df45 = pd.read_excel(u45, engine='xlrd' if u45.name.endswith('.xls') else None)
+            
             df45.columns = [str(c).strip() for c in df45.columns]
+            # Filtros solicitados: Estad != A y Tipo != AC
             df45 = df45[(df45['Estad'] != 'A') & (df45['Tipo'] != 'AC')].dropna(subset=['Vendedor'])
             
             df45['VN'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
             df45['VO'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
             df45['ADJ'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
             df45['VE'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
-            df45['TOMA_VO'] = df45['Tas. vo'].apply(lambda x: 1 if str(x) not in ['0', '0.0', 'nan', ''] else 0)
+            
+            # Lógica Tomas VO: Si la celda tiene contenido distinto a cero
+            df45['TOMA_VO'] = df45['Tas. vo'].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', 'None', ''] else 0)
             
             # Procesar U53
-            df53 = pd.read_excel(u53) if u53.name.endswith('.xlsx') else pd.read_csv(u53)
+            if u53.name.endswith('.csv'):
+                df53 = pd.read_csv(u53)
+            else:
+                df53 = pd.read_excel(u53, engine='xlrd' if u53.name.endswith('.xls') else None)
+                
             df53.columns = [str(c).strip() for c in df53.columns]
             df53 = df53[df53['Estado'] != 'AN'].dropna(subset=['Vendedor'])
             
-            # Consolidar
+            # Consolidar información
             u45_c = df45[['Vendedor', 'Nombre concesionario', 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']].rename(columns={'Vendedor':'Asesor', 'Nombre concesionario':'Sucursal'})
             u53_c = df53[['Vendedor', 'Origen']].rename(columns={'Vendedor':'Asesor', 'Origen':'Sucursal'})
             u53_c['PDA'] = 1
@@ -196,6 +205,7 @@ elif pagina == "Ranking de Asesores 🥇":
             res['TOTAL'] = res['VN'] + res['VO'] + res['ADJ'] + res['VE'] + res['PDA']
             res = res.sort_values('TOTAL', ascending=False).reset_index(drop=True)
             
+            # Insertar Ranking con Medallas
             def medallas(i):
                 if i == 0: return "🥇 1°"
                 elif i == 1: return "🥈 2°"
@@ -203,6 +213,8 @@ elif pagina == "Ranking de Asesores 🥇":
                 return f"{i+1}°"
             res.insert(0, 'Ranking', [medallas(i) for i in range(len(res))])
             
-            st.dataframe(res[['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']], hide_index=True)
+            # Mostrar Tabla Final con las 8 columnas + TOMAS VO
+            st.dataframe(res[['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']], hide_index=True, use_container_width=True)
+            
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Hubo un problema al leer los archivos: {e}. Asegúrate de que son los reportes U45 y U53 originales.")
