@@ -154,11 +154,89 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (SUCURSALES CORREGIDAS)
+# OPCIÓN 2: RANKING DE ASESORES (LOGICA MAESTRO Y HOJA UNICA)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
+    # --- MAESTRO DE ASESORES (FUENTE DE VERDAD) ---
+    maestro_asesores = {
+        "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
+        "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA",
+        "LEILA BRAVO": "SUCURSAL VIRTUAL",
+        "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
+        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS",
+        "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
+        "45 LAURA CASSANITI": "FORTECAR JUNIN",
+        "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
+        "FEDERICO RUBINO": "SUCURSAL VIRTUAL",
+        "784 GUSTAVO RIVAS": "GRANVILLE TRELEW",
+        "GERMAN CALVO": "SUCURSAL VIRTUAL",
+        "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
+        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO",
+        "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
+        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO",
+        "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
+        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA",
+        "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
+        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO",
+        "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL",
+        "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
+        "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
+        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO",
+        "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
+        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO",
+        "401 JOSE JUAN": "GRANVILLE JUNIN",
+        "409 IGNACIO SOSA": "FORTECAR PERGAMINO",
+        "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+        "913 NICOLAS MALDONADO": "FORTECAR SAN NICOLAS",
+        "CAMILA GARCIA": "SUCURSAL VIRTUAL",
+        "462 JORGE FERRAIUOLO": "FORTECAR JUNIN",
+        "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA",
+        "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO",
+        "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN",
+        "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN",
+        "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY",
+        "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO",
+        "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN",
+        "1048 BRUNO VIGNALE": "OPENCARS JUNIN",
+        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA",
+        "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS",
+        "1047 GISELL LLANOS": "GRANVILLE COMODORO",
+        "1088 FRANCO VEGA": "GRANVILLE PERGAMINO",
+        "402 CRISTIAN LOPEZ": "FORTECAR JUNIN",
+        "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO",
+        "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO",
+        "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS",
+        "CARLA VALLEJO": "SUCURSAL VIRTUAL",
+        "PILAR ALCOBA": "SUCURSAL VIRTUAL",
+        "781 SILVANA CHAMINE": "GRANVILLE MADRYN",
+        "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL",
+        "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO",
+        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN",
+        "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN",
+        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA",
+        "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS",
+        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN",
+        "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS",
+        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO",
+        "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY",
+        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS",
+        "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA",
+        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO",
+        "1112 AGUSTINA AUZA": "GRANVILLE MADRYN",
+        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN",
+        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL",
+        "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
+        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN",
+        "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
+        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA",
+        "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
+        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA",
+        "G GERENCIA MARC AS": "GERENCIA"
+    }
+
     c1, c2 = st.columns(2)
     with c1:
         u45 = st.file_uploader("Archivo U45 (Ventas)", type=["xlsx", "xls", "csv"], key="u45_key")
@@ -167,55 +245,26 @@ elif pagina == "Ranking de Asesores 🥇":
 
     if u45 and u53:
         try:
-            def cargar_datos_hoja1(file):
+            def cargar_archivo_simple(file):
                 if file.name.endswith('.csv'):
-                    df = pd.read_csv(file)
-                else:
-                    xls = pd.ExcelFile(file, engine='xlrd' if file.name.endswith('.xls') else None)
-                    # Forzamos Hoja 1
-                    nombre_hoja = "Hoja 1" if "Hoja 1" in xls.sheet_names else xls.sheet_names[0]
-                    df = xls.parse(nombre_hoja)
-                return df.loc[:, ~df.columns.duplicated()].copy()
+                    return pd.read_csv(file)
+                # Al no especificar hoja, toma la única que existe
+                return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
 
-            df45_raw = cargar_datos_hoja1(u45)
-            df53_raw = cargar_datos_hoja1(u53)
+            df45_raw = cargar_archivo_simple(u45)
+            df53_raw = cargar_archivo_simple(u53)
 
-            def limpiar_asesor(txt):
-                txt = str(txt).strip().upper()
-                partes = txt.split()
-                if partes and partes[0].isdigit():
-                    return " ".join(partes[1:])
-                return txt
-
-            # --- MAPA MAESTRO DE SUCURSALES (Lógica pedida) ---
-            mapa_sucursales = {}
-            
-            # Primero cargamos del U53 (Prioridad)
-            c_v_53 = df53_raw.columns[0] # Columna A
-            c_s_53 = next((c for c in df53_raw.columns if "ORIGEN" in str(c).upper() or "SUCURSAL" in str(c).upper() or "DESC" in str(c).upper()), df53_raw.columns[3])
-            
-            for _, row in df53_raw.iterrows():
-                key = limpiar_asesor(row[c_v_53])
-                mapa_sucursales[key] = str(row[c_s_53]).strip().upper()
-
-            # Luego del U45 si no estaban en el U53
-            c_v_45 = df45_raw.columns[4] # Columna E
-            c_s_45 = next((c for c in df45_raw.columns if "CONCESIONARIO" in str(c).upper() or "SUCURSAL" in str(c).upper()), df45_raw.columns[10])
-            
-            for _, row in df45_raw.iterrows():
-                key = limpiar_asesor(row[c_v_45])
-                if key not in mapa_sucursales:
-                    mapa_sucursales[key] = str(row[c_s_45]).strip().upper()
-
-            # --- PROCESAR VENTAS U45 ---
-            c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), None)
-            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), None)
+            # --- PROCESAR U45 (Vendedor Columna E - Índice 4) ---
+            df45_raw = df45_raw.loc[:, ~df45_raw.columns.str.contains('^Unnamed')]
+            c_v_45 = df45_raw.columns[4]
+            c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
+            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
             df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
-            df45['ASESOR_KEY'] = df45[c_v_45].apply(limpiar_asesor)
+            df45['KEY'] = df45[c_v_45].astype(str).str.strip().str.upper()
 
-            u45_sum = df45.groupby('ASESOR_KEY').apply(lambda x: pd.Series({
+            u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': (x[c_t_45].isin(['O', 'OP'])).sum(),
                 'VO': (x[c_t_45] == 'O2').sum(),
                 'ADJ': (x[c_t_45] == 'PL').sum(),
@@ -223,24 +272,31 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum() if c_vo_45 else 0
             })).reset_index()
 
-            # --- PROCESAR PLANES U53 ---
-            c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), None)
-            df53 = df53_raw.copy()
-            if c_e_53: df53 = df53[df53[c_e_53] != 'AN']
-            df53['ASESOR_KEY'] = df53[c_v_53].apply(limpiar_asesor)
-            u53_sum = df53.groupby('ASESOR_KEY').size().reset_index(name='PDA')
-
-            # --- UNIÓN Y DESEMPATE ---
-            todo = pd.merge(u45_sum, u53_sum, on='ASESOR_KEY', how='outer').fillna(0)
-            todo['Sucursal'] = todo['ASESOR_KEY'].map(mapa_sucursales)
-            todo['TOTAL'] = todo['VN'] + todo['VO'] + todo['ADJ'] + todo['VE'] + todo['PDA']
+            # --- PROCESAR U53 (Asesor Columna A - Índice 0) ---
+            df53_raw = df53_raw.loc[:, ~df53_raw.columns.str.contains('^Unnamed')]
+            c_v_53 = df53_raw.columns[0]
+            c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), "Estado")
             
-            res = todo.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
-            res.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(res))])
+            df53 = df53_raw.copy()
+            if c_e_53 in df53.columns:
+                df53 = df53[df53[c_e_53] != 'AN']
+            df53['KEY'] = df53[c_v_53].astype(str).str.strip().str.upper()
+            u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-            st.write("### 🏆 Ranking Consolidado")
-            st.dataframe(res[['Ranking', 'ASESOR_KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'ASESOR_KEY':'Asesor'}), 
+            # --- CONSOLIDACIÓN ---
+            ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
+            
+            # Asignación desde el Maestro
+            ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores).fillna("OTRA / NO IDENTIFICADA")
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
+            
+            # Ordenar por Total y luego por Toma VO
+            ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
+            ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+
+            st.write("### 🏆 Ranking Comercial Consolidado")
+            st.dataframe(ranking[['Ranking', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY':'Asesor'}), 
                          use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error en el procesamiento: {e}")
+            st.error(f"Error al procesar los archivos: {e}")
