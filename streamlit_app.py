@@ -154,7 +154,7 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (UNIFICADO POR HOJA 1)
+# OPCIÓN 2: RANKING DE ASESORES (DINÁMICO Y SIN ERRORES)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
@@ -167,74 +167,83 @@ elif pagina == "Ranking de Asesores 🥇":
 
     if u45 and u53:
         try:
-            # --- FUNCIÓN PARA LEER HOJA 1 ---
-            def leer_hoja_1(file):
+            def leer_datos(file):
                 if file.name.endswith('.csv'):
-                    return pd.read_csv(file)
-                # Intenta leer "Hoja 1", si no existe lee la primera pestaña
-                xls = pd.ExcelFile(file, engine='xlrd' if file.name.endswith('.xls') else None)
-                nombre_hoja = "Hoja 1" if "Hoja 1" in xls.sheet_names else xls.sheet_names[0]
-                return xls.parse(nombre_hoja)
+                    df = pd.read_csv(file)
+                else:
+                    xls = pd.ExcelFile(file, engine='xlrd' if file.name.endswith('.xls') else None)
+                    hoja = "Hoja 1" if "Hoja 1" in xls.sheet_names else xls.sheet_names[0]
+                    df = xls.parse(hoja)
+                # Limpiar columnas duplicadas y vacías
+                df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+                return df
 
             # --- PROCESAR U45 ---
-            df45 = leer_hoja_1(u45)
-            df45 = df45.loc[:, ~df45.columns.duplicated()]
+            df45 = leer_datos(u45)
+            df45.columns = [str(c).strip().upper() for c in df45.columns]
             
-            # Mapeo de columnas U45
-            col_vend_45 = df45.columns[4] # Columna E
-            col_suc_45 = next((c for c in df45.columns if "CONCESIONARIO" in str(c).upper() or "SUCURSAL" in str(c).upper()), df45.columns[10])
-            col_tipo_45 = next((c for c in df45.columns if "TIPO" in str(c).upper()), df45.columns[17])
-            col_estad_45 = next((c for c in df45.columns if "ESTAD" in str(c).upper()), df45.columns[18])
-            col_tasa_45 = next((c for c in df45.columns if "TAS. VO" in str(c).upper()), None)
+            # Buscar columnas por nombre clave
+            col_vend_45 = next((c for c in df45.columns if "VENDEDOR" in c or "ASESOR" in c), df45.columns[4])
+            col_suc_45 = next((c for c in df45.columns if "CONCESIONARIO" in c or "SUCURSAL" in c), df45.columns[10])
+            col_tipo_45 = next((c for c in df45.columns if "TIPO" in c), "TIPO")
+            col_estad_45 = next((c for c in df45.columns if "ESTAD" in c), "ESTAD")
+            col_tasa_45 = next((c for c in df45.columns if "TAS. VO" in c or "TASAS" in c), None)
 
-            # Filtros U45 y limpieza de nombres
-            df45[col_vend_45] = df45[col_vend_45].astype(str).str.strip().str.upper()
-            df45 = df45[(df45[col_estad_45] != 'A') & (df45[col_tipo_45] != 'AC')].dropna(subset=[col_vend_45])
+            # Limpieza de nombres de asesores (Quitar números iniciales ej: "784 ")
+            def limpiar_nombre(nombre):
+                nombre = str(nombre).strip().upper()
+                partes = nombre.split(" ", 1)
+                return partes[1] if len(partes) > 1 and partes[0].isdigit() else nombre
+
+            df45['ASESOR_LIMPIO'] = df45[col_vend_45].apply(limpiar_nombre)
             
-            # Cálculos U45
-            df45['VN'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
-            df45['VO'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
-            df45['ADJ'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
-            df45['VE'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
-            df45['TOMA_VO'] = df45[col_tasa_45].apply(lambda x: 1 if str(x).strip().upper() not in ['0', '0.0', 'NAN', 'NONE', '', '0,0'] else 0) if col_tasa_45 else 0
+            # Filtros
+            mask45 = (df45[col_estad_45] != 'A') & (df45[col_tipo_45] != 'AC')
+            df45_f = df45[mask45].copy()
+            
+            df45_f['VN'] = df45_f[col_tipo_45].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
+            df45_f['VO'] = df45_f[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
+            df45_f['ADJ'] = df45_f[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
+            df45_f['VE'] = df45_f[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
+            df45_f['TOMA_VO'] = df45_f[col_tasa_45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'NAN', 'NONE', '', '0,0'] else 0) if col_tasa_45 else 0
 
             # --- PROCESAR U53 ---
-            df53 = leer_hoja_1(u53)
-            df53 = df53.loc[:, ~df53.columns.duplicated()]
+            df53 = leer_datos(u53)
+            df53.columns = [str(c).strip().upper() for c in df53.columns]
             
-            col_vend_53 = "Asesor" if "Asesor" in df53.columns else df53.columns[0] # Columna A
-            col_suc_53 = next((c for c in df53.columns if "ORIGEN" in str(c).upper() or "SUCURSAL" in str(c).upper()), df53.columns[3])
-            col_est_53 = next((c for c in df53.columns if "ESTADO" in str(c).upper()), None)
+            col_vend_53 = next((c for c in df53.columns if "ASESOR" in c or "VENDEDOR" in c), df53.columns[0])
+            col_suc_53 = next((c for c in df53.columns if "ORIGEN" in c or "SUCURSAL" in c), "SUCURSAL")
+            col_est_53 = next((c for c in df53.columns if "ESTADO" in c), None)
             
-            # Filtros U53 y limpieza
-            df53[col_vend_53] = df53[col_vend_53].astype(str).str.strip().str.upper()
+            df53['ASESOR_LIMPIO'] = df53[col_vend_53].apply(limpiar_nombre)
             if col_est_53:
                 df53 = df53[df53[col_est_53] != 'AN']
 
-            # --- CONSOLIDACIÓN MAESTRA ---
-            # 1. Crear diccionario de Asesor -> Sucursal (priorizando U45 que suele ser más completo)
-            dict_sucursales = pd.concat([
-                df45[[col_vend_45, col_suc_45]].rename(columns={col_vend_45:'Asesor', col_suc_45:'Sucursal'}),
-                df53[[col_vend_53, col_suc_53]].rename(columns={col_vend_53:'Asesor', col_suc_53:'Sucursal'})
-            ]).drop_duplicates(subset=['Asesor'], keep='first').set_index('Asesor')['Sucursal'].to_dict()
+            # --- UNIFICAR SUCURSALES ---
+            # Creamos un mapa de Asesor -> Sucursal única
+            mapa_suc = pd.concat([
+                df45_f[['ASESOR_LIMPIO', col_suc_45]].rename(columns={'ASESOR_LIMPIO':'A', col_suc_45:'S'}),
+                df53[['ASESOR_LIMPIO', col_suc_53]].rename(columns={'ASESOR_LIMPIO':'A', col_suc_53:'S'})
+            ]).drop_duplicates('A').set_index('A')['S'].to_dict()
 
-            # 2. Preparar datos para sumar
-            u45_datos = df45[[col_vend_45, 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']].rename(columns={col_vend_45:'Asesor'})
-            u53_datos = df53[[col_vend_53]].rename(columns={col_vend_53:'Asesor'})
-            u53_datos['PDA'] = 1
+            # --- SUMAR TODO ---
+            u45_final = df45_f[['ASESOR_LIMPIO', 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']]
+            u53_final = df53[['ASESOR_LIMPIO']].copy()
+            u53_final['PDA'] = 1
             
-            # 3. Unir y Sumar
-            final = pd.concat([u45_datos, u53_datos], sort=False).fillna(0)
-            ranking = final.groupby('Asesor').sum().reset_index()
+            consolidado = pd.concat([u45_final, u53_final], sort=False).fillna(0)
+            res = consolidado.groupby('ASESOR_LIMPIO').sum().reset_index()
             
-            # 4. Reasignar la sucursal única
-            ranking['Sucursal'] = ranking['Asesor'].map(dict_sucursales)
+            res['SUCURSAL'] = res['ASESOR_LIMPIO'].map(mapa_suc)
+            res['TOTAL'] = res['VN'] + res['VO'] + res['PDA'] + res['ADJ'] + res['VE']
+            res = res.sort_values('TOTAL', ascending=False).reset_index(drop=True)
             
-            # 5. Totales y Medallas
-            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['PDA'] + ranking['ADJ'] + ranking['VE']
-            ranking = ranking.sort_values('TOTAL', ascending=False).reset_index(drop=True)
-            ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+            # Ranking visual
+            res.insert(0, 'RANKING', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(res))])
 
-            st.write(f"### 🏆 Ranking de Asesores (Consolidado por Sucursal)")
-            st.dataframe(ranking[['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']], 
-                         hide_index=True, use_container_width=True)
+            st.write("### 🏆 Ranking Consolidado de Asesores")
+            st.dataframe(res[['RANKING', 'ASESOR_LIMPIO', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'SUCURSAL']], 
+                         use_container_width=True, hide_index=True)
+
+        except Exception as e:
+            st.error(f"Error en los archivos: {e}")
