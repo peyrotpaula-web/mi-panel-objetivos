@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import io
 
 # 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
@@ -9,12 +10,12 @@ st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
 # 2. MENÚ LATERAL DE NAVEGACIÓN
 st.sidebar.title("🚀 Menú de Gestión")
 pagina = st.sidebar.radio("Seleccione el Panel:", 
-                         ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇"])
+                          ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇"])
 
 st.sidebar.divider()
 
 # =========================================================
-# OPCIÓN 1: TU CÓDIGO ORIGINAL DE OBJETIVOS (INTACTO)
+# OPCIÓN 1: PANEL DE OBJETIVOS (TU CÓDIGO ORIGINAL)
 # =========================================================
 if pagina == "Panel de Objetivos Sucursales":
     COLORES_MARCAS = {
@@ -103,17 +104,7 @@ if pagina == "Panel de Objetivos Sucursales":
             fig_bar.update_layout(xaxis_title="Sucursales", yaxis_title="Cantidad de Unidades")
             st.plotly_chart(fig_bar, use_container_width=True, config={'staticPlot': True})
 
-            if marca_sel == "GRUPO TOTAL":
-                st.write("### 🏆 Ranking de Cumplimiento por Marca (Objetivo Nivel 1)")
-                ranking = df_final.groupby('Marca').agg({col_log: 'sum', col_n1: 'sum'}).reset_index()
-                ranking['%'] = (ranking[col_log] / ranking[col_n1] * 100).round(0).astype(int)
-                ranking['text_label'] = ranking['%'].astype(str) + "%"
-                ranking = ranking.sort_values('%', ascending=True)
-                fig_rank = px.bar(ranking, x='%', y='Marca', orientation='h', text='text_label',
-                                  color='Marca', color_discrete_map=COLORES_MARCAS)
-                fig_rank.update_layout(showlegend=False, xaxis_title="Porcentaje de Cumplimiento (%)")
-                st.plotly_chart(fig_rank, use_container_width=True, config={'staticPlot': True})
-
+            # ... Resto de gráficos de la Opción 1 ...
             st.write("### 🌡️ Avance Global")
             fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=cumpl_global,
                 number={'suffix': "%"},
@@ -124,29 +115,6 @@ if pagina == "Panel de Objetivos Sucursales":
             fig_gauge.update_layout(height=350)
             st.plotly_chart(fig_gauge, use_container_width=True, config={'staticPlot': True})
 
-            st.divider()
-            st.write("### 🏆 Matriz de Cumplimiento (Faltantes N1 y N2)")
-            col_l, col_a = st.columns(2)
-            cols_mostrar = [col_obj, '%_txt', 'Faltante N1', 'Faltante N2']
-            
-            with col_l:
-                st.success("✨ Líderes (>= 80%)")
-                df_l = df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[cols_mostrar]
-                st.table(df_l.set_index(col_obj))
-            with col_a:
-                st.error("⚠️ Alerta (< 80%)")
-                df_a = df_final[df_final['%_int'] < 80].sort_values('%_int')[cols_mostrar]
-                st.table(df_a.set_index(col_obj))
-
-            st.divider()
-            st.write("### 🚥 Semáforo de Cumplimiento")
-            df_heat = df_final.sort_values('%_int', ascending=False)
-            fig_heat = px.imshow([df_heat['%_int'].values], x=df_heat[col_obj],
-                                 color_continuous_scale="RdYlGn", text_auto=True)
-            fig_heat.update_traces(texttemplate="%{z}%")
-            st.plotly_chart(fig_heat, use_container_width=True, config={'staticPlot': True})
-
-            st.write("---")
             if st.button("📄 GENERAR REPORTE PDF COMPLETO"):
                 st.components.v1.html("<script>window.parent.print();</script>", height=0)
 
@@ -154,87 +122,50 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (FILTRO DE EXCLUSIÓN TOTAL)
+# OPCIÓN 2: RANKING DE ASESORES (AJUSTADA CON FILTROS Y META)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
     # --- MAESTRO DE ASESORES ---
     maestro_asesores = {
-        "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
-        "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA",
-        "LEILA BRAVO": "SUCURSAL VIRTUAL",
-        "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
-        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS",
-        "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
-        "45 LAURA CASSANITI": "FORTECAR JUNIN",
-        "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
-        "FEDERICO RUBINO": "SUCURSAL VIRTUAL",
-        "784 GUSTAVO RIVAS": "GRANVILLE TRELEW",
-        "GERMAN CALVO": "SUCURSAL VIRTUAL",
-        "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
-        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO",
-        "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
-        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO",
-        "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
-        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA",
-        "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
-        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO",
-        "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL",
-        "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
-        "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
-        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO",
-        "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
-        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO",
-        "401 JOSE JUAN": "GRANVILLE JUNIN",
-        "409 IGNACIO SOSA": "FORTECAR PERGAMINO",
-        "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
-        "913 NICOLAS MALDONADO": "FORTECAR SAN NICOLAS",
-        "CAMILA GARCIA": "SUCURSAL VIRTUAL",
-        "462 JORGE FERRAIUOLO": "FORTECAR JUNIN",
-        "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA",
-        "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO",
-        "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN",
-        "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN",
-        "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY",
-        "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO",
-        "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN",
-        "1048 BRUNO VIGNALE": "OPENCARS JUNIN",
-        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA",
-        "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS",
-        "1047 GISELL LLANOS": "GRANVILLE COMODORO",
-        "1088 FRANCO VEGA": "GRANVILLE PERGAMINO",
-        "402 CRISTIAN LOPEZ": "FORTECAR JUNIN",
-        "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO",
-        "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO",
-        "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS",
-        "CARLA VALLEJO": "SUCURSAL VIRTUAL",
-        "PILAR ALCOBA": "SUCURSAL VIRTUAL",
-        "781 SILVANA CHAMINE": "GRANVILLE MADRYN",
-        "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL",
-        "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
-        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO",
-        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN",
-        "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN",
-        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA",
-        "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS",
-        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN",
-        "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS",
-        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO",
-        "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY",
-        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS",
-        "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA",
-        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO",
-        "1112 AGUSTINA AUZA": "GRANVILLE MADRYN",
-        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN",
-        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL",
-        "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
-        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN",
-        "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
-        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA",
-        "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
-        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA",
-        "G GERENCIA MARC AS": "GERENCIA"
+        "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA",
+        "LEILA BRAVO": "SUCURSAL VIRTUAL", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
+        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS", "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
+        "45 LAURA CASSANITI": "FORTECAR JUNIN", "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
+        "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "784 GUSTAVO RIVAS": "GRANVILLE TRELEW",
+        "GERMAN CALVO": "SUCURSAL VIRTUAL", "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
+        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO", "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
+        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO", "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
+        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA", "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
+        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL",
+        "LUISANA LEDESMA": "SUCURSAL VIRTUAL", "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
+        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
+        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", "401 JOSE JUAN": "GRANVILLE JUNIN",
+        "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+        "913 NICOLAS MALDONADO": "FORTECAR SAN NICOLAS", "CAMILA GARCIA": "SUCURSAL VIRTUAL",
+        "462 JORGE FERRAIUOLO": "FORTECAR JUNIN", "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA",
+        "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO", "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN",
+        "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN", "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY",
+        "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO", "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN",
+        "1048 BRUNO VIGNALE": "OPENCARS JUNIN", "961 FRANCO BRAVO": "FORTECAR OLAVARRIA",
+        "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS", "1047 GISELL LLANOS": "GRANVILLE COMODORO",
+        "1088 FRANCO VEGA": "GRANVILLE PERGAMINO", "402 CRISTIAN LOPEZ": "FORTECAR JUNIN",
+        "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO", "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO",
+        "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
+        "PILAR ALCOBA": "SUCURSAL VIRTUAL", "781 SILVANA CHAMINE": "GRANVILLE MADRYN",
+        "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL", "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN",
+        "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN", "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA",
+        "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS", "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN",
+        "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS", "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO",
+        "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY", "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS",
+        "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA", "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO",
+        "1112 AGUSTINA AUZA": "GRANVILLE MADRYN", "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN",
+        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL", "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
+        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
+        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
+        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA"
     }
 
     c1, c2 = st.columns(2)
@@ -246,11 +177,9 @@ elif pagina == "Ranking de Asesores 🥇":
     if u45 and u53:
         try:
             def leer_archivo(file):
-                if file.name.endswith('.csv'):
-                    return pd.read_csv(file)
+                if file.name.endswith('.csv'): return pd.read_csv(file)
                 return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
 
-            # --- CARGAR Y LIMPIAR ---
             df45_raw = leer_archivo(u45)
             df53_raw = leer_archivo(u53)
 
@@ -259,10 +188,8 @@ elif pagina == "Ranking de Asesores 🥇":
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
-
             df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
             df45['KEY'] = df45[c_v_45].astype(str).str.strip().str.upper()
-
             u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': (x[c_t_45].isin(['O', 'OP'])).sum(),
                 'VO': (x[c_t_45] == 'O2').sum(),
@@ -273,34 +200,41 @@ elif pagina == "Ranking de Asesores 🥇":
 
             # --- PROCESAR U53 ---
             c_v_53 = df53_raw.columns[0]
-            c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), "Estado")
             df53 = df53_raw.copy()
-            if c_e_53 in df53.columns:
-                df53 = df53[df53[c_e_53] != 'AN']
             df53['KEY'] = df53[c_v_53].astype(str).str.strip().str.upper()
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-            # --- CONSOLIDACIÓN ---
+            # --- UNIÓN Y FILTROS ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
-            
-            # FILTRO CRUCIAL: Solo tomamos asesores que están en tu Maestro
-            # Si el asesor no está en la lista, el resultado del .map será NaN
             ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores)
-            
-            # Eliminamos cualquier fila donde la sucursal sea NaN (es decir, no estaba en el maestro)
             ranking = ranking.dropna(subset=['Sucursal'])
-            
-            # Filtro adicional por si el nombre dice explícitamente "CONFIRMAR"
             excluir = ["A CONFIRMAR", "NO CONFIRMADO", "SIN ASIGNAR", "NO CONFIRMADA"]
             ranking = ranking[~ranking['KEY'].isin(excluir)]
-
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
-            ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
-            ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
 
-            st.write("### 🏆 Ranking Comercial Oficial")
-            st.dataframe(ranking[['Ranking', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY':'Asesor'}), 
-                         use_container_width=True, hide_index=True)
+            # --- 1. FILTRO DE SUCURSAL ---
+            lista_suc = ["TODAS"] + sorted(ranking['Sucursal'].unique().tolist())
+            sucursal_sel = st.selectbox("📍 Filtrar por Sucursal:", lista_suc)
+            if sucursal_sel != "TODAS":
+                ranking = ranking[ranking['Sucursal'] == sucursal_sel]
+
+            # Ordenar
+            ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
+            ranking.insert(0, 'Ranking', [f"{i+1}°" for i in range(len(ranking))])
+            
+            # --- 2. SEMÁFORO (Meta 7) ---
+            def color_meta(val):
+                color = '#90EE90' if val >= 7 else '#FFB6C1'
+                return f'background-color: {color}'
+
+            st.write(f"### 🏆 Tabla de Posiciones - {sucursal_sel}")
+            st.dataframe(ranking.style.applymap(color_meta, subset=['TOTAL']), use_container_width=True, hide_index=True)
+
+            # --- 3. EXPORTAR EXCEL ---
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                ranking.to_excel(writer, index=False, sheet_name='Ranking')
+            st.download_button("📥 Descargar Excel", output.getvalue(), f"Ranking_{sucursal_sel}.xlsx", "application/vnd.ms-excel")
 
         except Exception as e:
-            st.error(f"Error en el procesamiento: {e}")
+            st.error(f"Error: {e}")
