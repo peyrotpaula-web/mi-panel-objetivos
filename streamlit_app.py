@@ -154,7 +154,7 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING PROFESIONAL (FILTROS, METAS Y EXPORTACIÓN)
+# OPCIÓN 2: RANKING DE ASESORES (VERSIÓN ESTABLE)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
@@ -202,9 +202,9 @@ elif pagina == "Ranking de Asesores 🥇":
 
     c1, c2 = st.columns(2)
     with c1:
-        u45 = st.file_uploader("Subir U45 (Ventas)", type=["xlsx", "xls", "csv"], key="u45_v2")
+        u45 = st.file_uploader("Subir U45", type=["xlsx", "xls", "csv"], key="u45_v3")
     with c2:
-        u53 = st.file_uploader("Subir U53 (Planes)", type=["xlsx", "xls", "csv"], key="u53_v2")
+        u53 = st.file_uploader("Subir U53", type=["xlsx", "xls", "csv"], key="u53_v3")
 
     if u45 and u53:
         try:
@@ -215,13 +215,15 @@ elif pagina == "Ranking de Asesores 🥇":
             df45_raw = leer_archivo(u45)
             df53_raw = leer_archivo(u53)
 
-            # --- PROCESAMIENTO U45 ---
+            # --- U45 ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
+            
             df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
             df45['KEY'] = df45[c_v_45].astype(str).str.strip().str.upper()
+            
             u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': (x[c_t_45].isin(['O', 'OP'])).sum(),
                 'VO': (x[c_t_45] == 'O2').sum(),
@@ -230,48 +232,28 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum() if c_vo_45 else 0
             })).reset_index()
 
-            # --- PROCESAMIENTO U53 ---
+            # --- U53 ---
             c_v_53 = df53_raw.columns[0]
             df53 = df53_raw.copy()
             df53['KEY'] = df53[c_v_53].astype(str).str.strip().str.upper()
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-            # --- CONSOLIDACIÓN Y FILTRO POR MAESTRO ---
+            # --- UNIÓN ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores)
-            ranking = ranking.dropna(subset=['Sucursal']) # Solo los del maestro
+            
+            # Limpieza: Solo los que están en el maestro y no son "Confirmar"
+            ranking = ranking.dropna(subset=['Sucursal'])
+            excluir = ["A CONFIRMAR", "NO CONFIRMADO", "SIN ASIGNAR", "NO CONFIRMADA", "NAN", "NONE", ""]
+            ranking = ranking[~ranking['KEY'].isin(excluir)]
+            
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
-            
-            # --- 1. FILTRO DE SUCURSAL ---
-            lista_sucursales = ["TODAS"] + sorted(ranking['Sucursal'].unique().tolist())
-            sucursal_sel = st.selectbox("📍 Filtrar por Sucursal:", lista_sucursales)
-            
-            if sucursal_sel != "TODAS":
-                ranking = ranking[ranking['Sucursal'] == sucursal_sel]
-
-            # Ordenar por Total y Desempate VO
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
-            ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
-            ranking = ranking.rename(columns={'KEY':'Asesor'})
+            ranking.insert(0, 'Ranking', [f"{i+1}°" for i in range(len(ranking))])
 
-            # --- 2. FORMATO CONDICIONAL (SEMÁFORO) ---
-            def color_meta(val):
-                color = '#90EE90' if val >= 7 else '#FFB6C1' # Verde claro o Rojo claro
-                return f'background-color: {color}'
-
-            st.write(f"### 🏆 Tabla de Posiciones - {sucursal_sel}")
-            st.dataframe(ranking.style.applymap(color_meta, subset=['TOTAL']), use_container_width=True, hide_index=True)
-
-            # --- 3. BOTÓN EXPORTAR EXCEL ---
-            @st.cache_data
-            def convertir_excel(df):
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Ranking')
-                return output.getvalue()
-
-            excel_data = convertir_excel(ranking)
-            st.download_button(label="📥 Descargar Ranking en Excel", data=excel_data, file_name=f'Ranking_{sucursal_sel}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            st.write("### 🏆 Ranking Consolidado")
+            st.dataframe(ranking[['Ranking', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY':'Asesor'}), 
+                         use_container_width=True, hide_index=True)
 
         except Exception as e:
             st.error(f"Error: {e}")
