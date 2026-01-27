@@ -154,12 +154,12 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (LOGICA MAESTRO Y HOJA UNICA)
+# OPCIÓN 2: RANKING DE ASESORES (FILTRO DE EXCLUSIÓN TOTAL)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # --- MAESTRO DE ASESORES (FUENTE DE VERDAD) ---
+    # --- MAESTRO DE ASESORES ---
     maestro_asesores = {
         "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
         "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA",
@@ -245,17 +245,16 @@ elif pagina == "Ranking de Asesores 🥇":
 
     if u45 and u53:
         try:
-            def cargar_archivo_simple(file):
+            def leer_archivo(file):
                 if file.name.endswith('.csv'):
                     return pd.read_csv(file)
-                # Al no especificar hoja, toma la única que existe
                 return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
 
-            df45_raw = cargar_archivo_simple(u45)
-            df53_raw = cargar_archivo_simple(u53)
+            # --- CARGAR Y LIMPIAR ---
+            df45_raw = leer_archivo(u45)
+            df53_raw = leer_archivo(u53)
 
-            # --- PROCESAR U45 (Vendedor Columna E - Índice 4) ---
-            df45_raw = df45_raw.loc[:, ~df45_raw.columns.str.contains('^Unnamed')]
+            # --- PROCESAR U45 ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -272,11 +271,9 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum() if c_vo_45 else 0
             })).reset_index()
 
-            # --- PROCESAR U53 (Asesor Columna A - Índice 0) ---
-            df53_raw = df53_raw.loc[:, ~df53_raw.columns.str.contains('^Unnamed')]
+            # --- PROCESAR U53 ---
             c_v_53 = df53_raw.columns[0]
             c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), "Estado")
-            
             df53 = df53_raw.copy()
             if c_e_53 in df53.columns:
                 df53 = df53[df53[c_e_53] != 'AN']
@@ -286,17 +283,24 @@ elif pagina == "Ranking de Asesores 🥇":
             # --- CONSOLIDACIÓN ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             
-            # Asignación desde el Maestro
-            ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores).fillna("OTRA / NO IDENTIFICADA")
-            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
+            # FILTRO CRUCIAL: Solo tomamos asesores que están en tu Maestro
+            # Si el asesor no está en la lista, el resultado del .map será NaN
+            ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores)
             
-            # Ordenar por Total y luego por Toma VO
+            # Eliminamos cualquier fila donde la sucursal sea NaN (es decir, no estaba en el maestro)
+            ranking = ranking.dropna(subset=['Sucursal'])
+            
+            # Filtro adicional por si el nombre dice explícitamente "CONFIRMAR"
+            excluir = ["A CONFIRMAR", "NO CONFIRMADO", "SIN ASIGNAR", "NO CONFIRMADA"]
+            ranking = ranking[~ranking['KEY'].isin(excluir)]
+
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
             ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
 
-            st.write("### 🏆 Ranking Comercial Consolidado")
+            st.write("### 🏆 Ranking Comercial Oficial")
             st.dataframe(ranking[['Ranking', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY':'Asesor'}), 
                          use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error al procesar los archivos: {e}")
+            st.error(f"Error en el procesamiento: {e}")
