@@ -154,12 +154,11 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (AJUSTADO PARA .XLS)
+# OPCIÓN 2: RANKING DE ASESORES (AJUSTADO A COLUMNA TAS. VO)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # AHORA ACEPTA .XLS, .XLSX y .CSV
     c1, c2 = st.columns(2)
     with c1:
         u45 = st.file_uploader("Archivo U45 (Ventas)", type=["xlsx", "xls", "csv"], key="u45_key")
@@ -168,53 +167,85 @@ elif pagina == "Ranking de Asesores 🥇":
 
     if u45 and u53:
         try:
-            # Procesar U45 con soporte para formatos antiguos
+            # --- PROCESAR U45 ---
             if u45.name.endswith('.csv'):
                 df45 = pd.read_csv(u45)
             else:
                 df45 = pd.read_excel(u45, engine='xlrd' if u45.name.endswith('.xls') else None)
             
-            df45.columns = [str(c).strip() for c in df45.columns]
-            # Filtros solicitados: Estad != A y Tipo != AC
-            df45 = df45[(df45['Estad'] != 'A') & (df45['Tipo'] != 'AC')].dropna(subset=['Vendedor'])
+            # Limpiamos nombres de columnas (Quitar espacios y pasar a MAYÚSCULAS)
+            df45.columns = [str(c).strip().upper() for c in df45.columns]
             
-            df45['VN'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
-            df45['VO'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
-            df45['ADJ'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
-            df45['VE'] = df45['Tipo'].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
+            # Identificar columnas clave (ahora buscamos TAS. VO exacto)
+            col_tasa = "TAS. VO" if "TAS. VO" in df45.columns else next((c for c in df45.columns if "TAS" in c and "VO" in c), None)
+            col_vendedor = "VENDEDOR" if "VENDEDOR" in df45.columns else df45.columns[4] # Columna E suele ser la 4
+            col_tipo = "TIPO" if "TIPO" in df45.columns else df45.columns[17] # Columna R suele ser la 17
+            col_estad = "ESTAD" if "ESTAD" in df45.columns else df45.columns[18] # Columna S suele ser la 18
+            col_sucursal = "NOMBRE CONCESIONARIO" if "NOMBRE CONCESIONARIO" in df45.columns else df45.columns[10] # Columna K suele ser la 10
+
+            # Aplicar Filtros (Estad != A y Tipo != AC)
+            df45 = df45[(df45[col_estad] != 'A') & (df45[col_tipo] != 'AC')].dropna(subset=[col_vendedor])
             
-            # Lógica Tomas VO: Si la celda tiene contenido distinto a cero
-            df45['TOMA_VO'] = df45['Tas. vo'].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', 'None', ''] else 0)
+            # Clasificación de Ventas
+            df45['VN'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
+            df45['VO'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
+            df45['ADJ'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
+            df45['VE'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
             
-            # Procesar U53
+            # Lógica TOMAS VO (Columna AN: TAS. VO)
+            if col_tasa:
+                # Cuenta 1 si hay cualquier valor que no sea cero, vacío o nan
+                df45['TOMA_VO'] = df45[col_tasa].apply(lambda x: 1 if str(x).strip().upper() not in ['0', '0.0', 'NAN', 'NONE', '', '0,0'] else 0)
+            else:
+                df45['TOMA_VO'] = 0
+            
+            # --- PROCESAR U53 ---
             if u53.name.endswith('.csv'):
                 df53 = pd.read_csv(u53)
             else:
                 df53 = pd.read_excel(u53, engine='xlrd' if u53.name.endswith('.xls') else None)
                 
-            df53.columns = [str(c).strip() for c in df53.columns]
-            df53 = df53[df53['Estado'] != 'AN'].dropna(subset=['Vendedor'])
+            df53.columns = [str(c).strip().upper() for c in df53.columns]
+            col_vend_53 = "VENDEDOR" if "VENDEDOR" in df53.columns else df53.columns[0]
+            col_estado_53 = "ESTADO" if "ESTADO" in df53.columns else "ESTADO"
+            col_suc_53 = "ORIGEN" if "ORIGEN" in df53.columns else "SUCURSAL"
             
-            # Consolidar información
-            u45_c = df45[['Vendedor', 'Nombre concesionario', 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']].rename(columns={'Vendedor':'Asesor', 'Nombre concesionario':'Sucursal'})
-            u53_c = df53[['Vendedor', 'Origen']].rename(columns={'Vendedor':'Asesor', 'Origen':'Sucursal'})
+            # Filtro PDA (Estado != AN)
+            if col_estado_53 in df53.columns:
+                df53 = df53[df53[col_estado_53] != 'AN']
+            df53 = df53.dropna(subset=[col_vend_53])
+            
+            # --- CONSOLIDAR ---
+            u45_c = df45[[col_vendedor, col_sucursal, 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']].rename(columns={col_vendedor:'Asesor', col_sucursal:'Sucursal'})
+            
+            u53_c = df53[[col_vend_53, col_suc_53]].rename(columns={col_vend_53:'Asesor', col_suc_53:'Sucursal'})
             u53_c['PDA'] = 1
             
-            final = pd.concat([u45_c, u53_c]).fillna(0)
+            final = pd.concat([u45_c, u53_c], sort=False).fillna(0)
             res = final.groupby(['Asesor', 'Sucursal']).sum().reset_index()
-            res['TOTAL'] = res['VN'] + res['VO'] + res['ADJ'] + res['VE'] + res['PDA']
-            res = res.sort_values('TOTAL', ascending=False).reset_index(drop=True)
             
-            # Insertar Ranking con Medallas
-            def medallas(i):
+            # Calcular Total Ventas (VN + VO + PDA + ADJ + VE)
+            res['TOTAL VENTAS'] = res['VN'] + res['VO'] + res['PDA'] + res['ADJ'] + res['VE']
+            res = res.sort_values('TOTAL VENTAS', ascending=False).reset_index(drop=True)
+            
+            # Medallas Top 3
+            def asignar_puesto(i):
                 if i == 0: return "🥇 1°"
                 elif i == 1: return "🥈 2°"
                 elif i == 2: return "🥉 3°"
                 return f"{i+1}°"
-            res.insert(0, 'Ranking', [medallas(i) for i in range(len(res))])
+            res.insert(0, 'Ranking', [asignar_puesto(i) for i in range(len(res))])
             
-            # Mostrar Tabla Final con las 8 columnas + TOMAS VO
-            st.dataframe(res[['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']], hide_index=True, use_container_width=True)
+            # Reordenar columnas para visualización
+            columnas_finales = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL VENTAS', 'TOMA_VO', 'Sucursal']
+            
+            st.write(f"### 🏆 Top Asesores: {len(res)} encontrados")
+            st.dataframe(res[columnas_finales], hide_index=True, use_container_width=True)
+            
+            # Botón de Descarga
+            csv = res[columnas_finales].to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Descargar Ranking CSV", csv, "ranking_comercial.csv", "text/csv")
             
         except Exception as e:
-            st.error(f"Hubo un problema al leer los archivos: {e}. Asegúrate de que son los reportes U45 y U53 originales.")
+            st.error(f"Error en el procesamiento: {e}")
+            st.info("Asegúrate de que los archivos U45 y U53 tienen los nombres de columnas originales.")
