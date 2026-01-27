@@ -154,7 +154,7 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (AJUSTADO A COLUMNA TAS. VO)
+# OPCIÓN 2: RANKING DE ASESORES (LÓGICA E Y A)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
@@ -167,85 +167,72 @@ elif pagina == "Ranking de Asesores 🥇":
 
     if u45 and u53:
         try:
-            # --- PROCESAR U45 ---
+            # --- PROCESAR U45 (Vendedor en Columna E) ---
             if u45.name.endswith('.csv'):
                 df45 = pd.read_csv(u45)
             else:
                 df45 = pd.read_excel(u45, engine='xlrd' if u45.name.endswith('.xls') else None)
             
-            # Limpiamos nombres de columnas (Quitar espacios y pasar a MAYÚSCULAS)
-            df45.columns = [str(c).strip().upper() for c in df45.columns]
+            df45 = df45.loc[:, ~df45.columns.duplicated()]
             
-            # Identificar columnas clave (ahora buscamos TAS. VO exacto)
-            col_tasa = "TAS. VO" if "TAS. VO" in df45.columns else next((c for c in df45.columns if "TAS" in c and "VO" in c), None)
-            col_vendedor = "VENDEDOR" if "VENDEDOR" in df45.columns else df45.columns[4] # Columna E suele ser la 4
-            col_tipo = "TIPO" if "TIPO" in df45.columns else df45.columns[17] # Columna R suele ser la 17
-            col_estad = "ESTAD" if "ESTAD" in df45.columns else df45.columns[18] # Columna S suele ser la 18
-            col_sucursal = "NOMBRE CONCESIONARIO" if "NOMBRE CONCESIONARIO" in df45.columns else df45.columns[10] # Columna K suele ser la 10
+            # Forzamos la identificación de columnas del U45
+            # Columna E es el índice 4 (0=A, 1=B, 2=C, 3=D, 4=E)
+            col_vend_45 = df45.columns[4] 
+            col_tipo_45 = next((c for c in df45.columns if "Tipo" in str(c) or "TIPO" in str(c)), df45.columns[17])
+            col_estad_45 = next((c for c in df45.columns if "Estad" in str(c) or "ESTAD" in str(c)), df45.columns[18])
+            col_suc_45 = next((c for c in df45.columns if "Nombre concesionario" in str(c) or "CONCESIONARIO" in str(c)), df45.columns[10])
+            col_tasa_45 = next((c for c in df45.columns if "TAS. VO" in str(c).upper()), None)
 
-            # Aplicar Filtros (Estad != A y Tipo != AC)
-            df45 = df45[(df45[col_estad] != 'A') & (df45[col_tipo] != 'AC')].dropna(subset=[col_vendedor])
+            # Filtros U45
+            df45 = df45[(df45[col_estad_45] != 'A') & (df45[col_tipo_45] != 'AC')].dropna(subset=[col_vend_45])
             
-            # Clasificación de Ventas
-            df45['VN'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
-            df45['VO'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
-            df45['ADJ'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
-            df45['VE'] = df45[col_tipo].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
+            # Conteos U45
+            df45['VN'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() in ['O', 'OP'] else 0)
+            df45['VO'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'O2' else 0)
+            df45['ADJ'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'PL' else 0)
+            df45['VE'] = df45[col_tipo_45].apply(lambda x: 1 if str(x).upper() == 'VE' else 0)
+            df45['TOMA_VO'] = df45[col_tasa_45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0) if col_tasa_45 else 0
             
-            # Lógica TOMAS VO (Columna AN: TAS. VO)
-            if col_tasa:
-                # Cuenta 1 si hay cualquier valor que no sea cero, vacío o nan
-                df45['TOMA_VO'] = df45[col_tasa].apply(lambda x: 1 if str(x).strip().upper() not in ['0', '0.0', 'NAN', 'NONE', '', '0,0'] else 0)
-            else:
-                df45['TOMA_VO'] = 0
-            
-            # --- PROCESAR U53 ---
+            # --- PROCESAR U53 (Asesor en Columna A) ---
             if u53.name.endswith('.csv'):
                 df53 = pd.read_csv(u53)
             else:
                 df53 = pd.read_excel(u53, engine='xlrd' if u53.name.endswith('.xls') else None)
-                
-            df53.columns = [str(c).strip().upper() for c in df53.columns]
-            col_vend_53 = "VENDEDOR" if "VENDEDOR" in df53.columns else df53.columns[0]
-            col_estado_53 = "ESTADO" if "ESTADO" in df53.columns else "ESTADO"
-            col_suc_53 = "ORIGEN" if "ORIGEN" in df53.columns else "SUCURSAL"
             
-            # Filtro PDA (Estado != AN)
-            if col_estado_53 in df53.columns:
-                df53 = df53[df53[col_estado_53] != 'AN']
+            df53 = df53.loc[:, ~df53.columns.duplicated()]
+            
+            # Columna A es el índice 0
+            col_vend_53 = "Asesor" if "Asesor" in df53.columns else df53.columns[0]
+            col_suc_53 = next((c for c in df53.columns if "Origen" in str(c) or "ORIGEN" in str(c)), df53.columns[3])
+            col_est_53 = next((c for c in df53.columns if "Estado" in str(c) or "ESTADO" in str(c)), None)
+            
+            if col_est_53:
+                df53 = df53[df53[col_est_53] != 'AN']
             df53 = df53.dropna(subset=[col_vend_53])
-            
+
             # --- CONSOLIDAR ---
-            u45_c = df45[[col_vendedor, col_sucursal, 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']].rename(columns={col_vendedor:'Asesor', col_sucursal:'Sucursal'})
+            # Normalizamos nombres a 'Asesor Final'
+            u45_final = df45[[col_vend_45, col_suc_45, 'VN', 'VO', 'ADJ', 'VE', 'TOMA_VO']].rename(columns={col_vend_45:'Asesor_Final', col_suc_45:'Sucursal'})
+            u53_final = df53[[col_vend_53, col_suc_53]].rename(columns={col_vend_53:'Asesor_Final', col_suc_53:'Sucursal'})
+            u53_final['PDA'] = 1
             
-            u53_c = df53[[col_vend_53, col_suc_53]].rename(columns={col_vend_53:'Asesor', col_suc_53:'Sucursal'})
-            u53_c['PDA'] = 1
+            consolidado = pd.concat([u45_final, u53_final], sort=False).fillna(0)
             
-            final = pd.concat([u45_c, u53_c], sort=False).fillna(0)
-            res = final.groupby(['Asesor', 'Sucursal']).sum().reset_index()
+            # Agrupar
+            ranking = consolidado.groupby(['Asesor_Final', 'Sucursal']).sum().reset_index()
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['PDA'] + ranking['ADJ'] + ranking['VE']
+            ranking = ranking.sort_values('TOTAL', ascending=False).reset_index(drop=True)
             
-            # Calcular Total Ventas (VN + VO + PDA + ADJ + VE)
-            res['TOTAL VENTAS'] = res['VN'] + res['VO'] + res['PDA'] + res['ADJ'] + res['VE']
-            res = res.sort_values('TOTAL VENTAS', ascending=False).reset_index(drop=True)
+            # Medallas
+            ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
             
-            # Medallas Top 3
-            def asignar_puesto(i):
-                if i == 0: return "🥇 1°"
-                elif i == 1: return "🥈 2°"
-                elif i == 2: return "🥉 3°"
-                return f"{i+1}°"
-            res.insert(0, 'Ranking', [asignar_puesto(i) for i in range(len(res))])
+            # Renombrar para mostrar
+            resultado_ver = ranking.rename(columns={'Asesor_Final': 'Asesor'})
             
-            # Reordenar columnas para visualización
-            columnas_finales = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL VENTAS', 'TOMA_VO', 'Sucursal']
-            
-            st.write(f"### 🏆 Top Asesores: {len(res)} encontrados")
-            st.dataframe(res[columnas_finales], hide_index=True, use_container_width=True)
-            
-            # Botón de Descarga
-            csv = res[columnas_finales].to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 Descargar Ranking CSV", csv, "ranking_comercial.csv", "text/csv")
-            
+            st.write(f"### 🏆 Ranking de Asesores")
+            st.dataframe(resultado_ver[['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']], 
+                         hide_index=True, use_container_width=True)
+
         except Exception as e:
-            st.error(f"Error en el procesamiento: {e}")
-            st.info("Asegúrate de que los archivos U45 y U53 tienen los nombres de columnas originales.")
+            st.error(f"Error procesando los archivos: {e}")
+            st.info("Revisa que el U45 tenga al Vendedor en la columna E y el U53 al Asesor en la columna A.")
