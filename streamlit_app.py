@@ -154,14 +154,16 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING - MAPEO DE COLUMNAS ESTRICTO
+# OPCIÓN 2: RANKING - MAPEO DE COLUMNAS EXACTO E INFALIBLE
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
+    # Los 9 asesores virtuales específicos
     virtuales = ["LEILA BRAVO", "FEDERICO RUBINO", "GERMAN CALVO", "JAZMIN BERAZATEGUI", 
                  "LUISANA LEDESMA", "CAMILA GARCIA", "CARLA VALLEJO", "PILAR ALCOBA", "ROCIO FERNANDEZ"]
 
+    # Maestro de asesores estándar (Nombre completo tal cual aparece en el Excel)
     maestro_std = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "GRANVILLE CITROEN SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", 
@@ -199,79 +201,88 @@ elif pagina == "Ranking de Asesores 🥇":
     }
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Subir U45", type=["xlsx","xls"], key="u45_st")
-    with c2: u53 = st.file_uploader("Subir U53", type=["xlsx","xls"], key="u53_st")
+    with c1: u45 = st.file_uploader("Subir U45", type=["xlsx","xls"], key="u45_arg")
+    with c2: u53 = st.file_uploader("Subir U53", type=["xlsx","xls"], key="u53_arg")
 
     if u45 and u53:
         try:
             df45 = pd.read_excel(u45)
             df53 = pd.read_excel(u53)
 
-            # --- RUTA DE DATOS U45 ---
-            col_e_45 = df45.columns[4]  # Columna E (Vendedor Estándar)
-            col_bk_45 = "VENDEDOR COMPARTIDO" # Columna BK (Vendedor Virtual)
-            c_t45 = next((c for c in df45.columns if "TIPO" in str(c).upper()), "Tipo")
-            c_e45 = next((c for c in df45.columns if "ESTAD" in str(c).upper()), "Estad")
-            c_vo45 = next((c for c in df45.columns if "TAS. VO" in str(c).upper()), "TAS. VO")
-
-            # --- RUTA DE DATOS U53 ---
-            col_a_53 = df53.columns[0]  # Columna A (PDA Estándar)
-            col_c_53 = df53.columns[2]  # Columna C (PDA Virtual)
-            c_e53 = next((c for c in df53.columns if "ESTAD" in str(c).upper()), "Estado")
+            # --- RUTA DE DATOS ESTRICTA ---
+            col_vendedor_std_u45 = df45.columns[4]   # Columna E
+            col_vendedor_virt_u45 = "VENDEDOR COMPARTIDO" # Columna BK
+            
+            col_pda_std_u53 = df53.columns[0]        # Columna A
+            col_pda_virt_u53 = df53.columns[2]        # Columna C
 
             res_final = []
 
-            # 1. PROCESAR ESTÁNDAR (Físicos) - Ruta: U45(E) y U53(A)
+            # 1. PROCESAR ESTÁNDAR (U45-E y U53-A)
             for nom, suc in maestro_std.items():
-                m45 = (df45[c_e45] != 'A') & (df45[c_t45] != 'AC') & (df45[col_e_45].astype(str).str.contains(nom, na=False))
-                m53 = (df53[c_e53] != 'AN') & (df53[col_a_53].astype(str).str.contains(nom, na=False))
-                
+                # Filtro U45 para Estándar
+                m45 = (df45[col_vendedor_std_u45].astype(str).str.upper().str.strip() == nom.upper()) & (df45.iloc[:, 7] != 'A')
                 d45 = df45[m45]
-                vn, vo, pda = (d45[c_t45].isin(['O', 'OP'])).sum(), (d45[c_t45] == 'O2').sum(), m53.sum()
-                adj, ve = (d45[c_t45] == 'PL').sum(), (d45[c_t45] == 'VE').sum()
-                toma = d45[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
+                
+                # Filtro U53 para Estándar (PDA en Columna A)
+                m53 = (df53[col_pda_std_u53].astype(str).str.upper().str.strip() == nom.upper()) & (df53.iloc[:, 13] != 'AN')
+                
+                vn = (d45.iloc[:, 5].isin(['O', 'OP'])).sum()
+                vo = (d45.iloc[:, 5] == 'O2').sum()
+                pda = m53.sum()
+                adj = (d45.iloc[:, 5] == 'PL').sum()
+                ve = (d45.iloc[:, 5] == 'VE').sum()
+                toma = d45.iloc[:, 15].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', ''] else 0).sum()
 
                 if (vn+vo+pda+adj+ve+toma) > 0:
-                    res_final.append({'Asesor': nom, 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 'VE': ve, 'TOMA_VO': toma, 'Sucursal': suc, 'Virtual': False})
+                    res_final.append({'Asesor': nom, 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 'VE': ve, 'TOMA_VO': toma, 'Sucursal': suc, 'EsVirt': False})
 
-            # 2. PROCESAR VIRTUALES (9) - Ruta: U45(BK) y U53(C)
+            # 2. PROCESAR VIRTUALES (U45-BK y U53-C)
             for v in virtuales:
-                m45_v = (df45[c_e45] != 'A') & (df45[col_bk_45].fillna('').str.upper().str.contains(v))
-                m53_v = (df53[c_e53] != 'AN') & (df53[col_c_53].fillna('').astype(str).str.upper().str.contains(v))
-                
+                # Filtro U45 para Virtual (Vendedor Compartido BK)
+                m45_v = (df45[col_vendedor_virt_u45].astype(str).str.upper().str.contains(v.upper())) & (df45.iloc[:, 7] != 'A')
                 d45_v = df45[m45_v]
-                vn_v, vo_v, pda_v = (d45_v[c_t45].isin(['O', 'OP'])).sum(), (d45_v[c_t45] == 'O2').sum(), m53_v.sum()
-                adj_v, ve_v = (d45_v[c_t45] == 'PL').sum(), (d45_v[c_t45] == 'VE').sum()
-                toma_v = d45_v[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
+                
+                # Filtro U53 para Virtual (PDA en Columna C únicamente)
+                m53_v = (df53[col_pda_virt_u53].astype(str).str.upper().str.contains(v.upper())) & (df53.iloc[:, 13] != 'AN')
+                
+                vn_v = (d45_v.iloc[:, 5].isin(['O', 'OP'])).sum()
+                vo_v = (d45_v.iloc[:, 5] == 'O2').sum()
+                pda_v = m53_v.sum()
+                adj_v = (d45_v.iloc[:, 5] == 'PL').sum()
+                ve_v = (d45_v.iloc[:, 5] == 'VE').sum()
+                toma_v = d45_v.iloc[:, 15].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', ''] else 0).sum()
 
                 if (vn_v+vo_v+pda_v+adj_v+ve_v+toma_v) > 0:
-                    res_final.append({'Asesor': v, 'VN': vn_v, 'VO': vo_v, 'PDA': pda_v, 'ADJ': adj_v, 'VE': ve_v, 'TOMA_VO': toma_v, 'Sucursal': 'SUCURSAL VIRTUAL', 'Virtual': True})
+                    res_final.append({'Asesor': v, 'VN': vn_v, 'VO': vo_v, 'PDA': pda_v, 'ADJ': adj_v, 'VE': ve_v, 'TOMA_VO': toma_v, 'Sucursal': 'SUCURSAL VIRTUAL', 'EsVirt': True})
 
-            # --- ARMADO DE RANKING ---
-            df_res = pd.DataFrame(res_final)
-            df_res['TOTAL'] = df_res['VN'] + df_res['VO'] + df_res['PDA'] + df_res['ADJ'] + df_res['VE']
-            df_res = df_res.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=False).reset_index(drop=True)
+            # Armar tabla final
+            ranking = pd.DataFrame(res_final)
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['PDA'] + ranking['ADJ'] + ranking['VE']
+            ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=False).reset_index(drop=True)
 
-            # Ranking con Medallas
-            def f_rank(i):
+            # Agregar Medallas
+            def aplicar_medalla(i):
                 if i == 0: return "🥇 1°"
                 if i == 1: return "🥈 2°"
                 if i == 2: return "🥉 3°"
                 return f"{i+1}°"
-            df_res.insert(0, 'Ranking', [f_rank(i) for i in range(len(df_res))])
+            ranking.insert(0, 'Ranking', [aplicar_medalla(i) for i in range(len(ranking))])
 
-            # TOTALES (Solo Estándar)
-            stds = df_res[df_res['Virtual'] == False]
-            fila_total = pd.DataFrame({
+            # Calcular TOTAL GENERAL (Excluyendo Virtuales)
+            solo_std = ranking[ranking['EsVirt'] == False]
+            fila_totales = pd.DataFrame({
                 'Ranking': [''], 'Asesor': ['TOTAL GENERAL'], 
-                'VN': [stds['VN'].sum()], 'VO': [stds['VO'].sum()], 'PDA': [stds['PDA'].sum()], 
-                'ADJ': [stds['ADJ'].sum()], 'VE': [stds['VE'].sum()], 'TOMA_VO': [stds['TOMA_VO'].sum()], 
-                'TOTAL': [stds['TOTAL'].sum()], 'Sucursal': ['']
+                'VN': [solo_std['VN'].sum()], 'VO': [solo_std['VO'].sum()], 
+                'PDA': [solo_std['PDA'].sum()], 'ADJ': [solo_std['ADJ'].sum()], 
+                'VE': [solo_std['VE'].sum()], 'TOMA_VO': [solo_std['TOMA_VO'].sum()], 
+                'TOTAL': [solo_std['TOTAL'].sum()], 'Sucursal': ['']
             })
 
-            cols = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
+            # Mostrar tabla
+            columnas_orden = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
             st.write("### 🏆 Ranking Comercial Oficial")
-            st.dataframe(pd.concat([df_res[cols], fila_total], ignore_index=True).fillna(''), use_container_width=True, hide_index=True)
+            st.dataframe(pd.concat([ranking[columnas_orden], fila_totales], ignore_index=True).fillna(''), use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Hubo un error al procesar: {e}")
