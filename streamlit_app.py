@@ -154,171 +154,146 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING RECONSTRUIDO - LÓGICA DE LEGAJOS Y COLUMNA C
+# OPCIÓN 2: RANKING - RECONSTRUCCIÓN TOTAL SEGURA
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # Lista de Virtuales (Búsqueda por nombre)
+    # 1. Los 9 Virtuales (Lógica: U45-BK y U53-Columna C)
     virtuales = ["LEILA BRAVO", "FEDERICO RUBINO", "GERMAN CALVO", "JAZMIN BERAZATEGUI", 
                  "LUISANA LEDESMA", "CAMILA GARCIA", "CARLA VALLEJO", "PILAR ALCOBA", "ROCIO FERNANDEZ"]
 
-    # Maestro de Asesores (Búsqueda por Legajo para que no se pierda nadie)
+    # 2. Maestro Estándar (Lógica: Nombre exacto como estaba antes)
     maestro_std = {
-        "1115": ["JORGE ZORRO", "GRANVILLE TRELEW"],
-        "1114": ["FACUNDO BOTAZZI", "GRANVILLE CITROEN SAN NICOLAS"],
-        "1090": ["FACUNDO BLAIOTTA", "GRANVILLE JUNIN"],
-        "843": ["JUAN ANDRES SILVA", "FORTECAR TRENQUE LAUQUEN"],
-        "682": ["TOMAS VILLAMIL SOUBLE", "PAMPAWAGEN SANTA ROSA"],
-        "980": ["NAVARRO RAFAEL", "PAMPAWAGEN SANTA ROSA"],
-        "912": ["NICOLAS MARCHIORI", "FORTECAR SAN NICOLAS"],
-        "467": ["FABIAN LOSCERTALES", "PAMPAWAGEN GENERAL PICO"],
-        "45": ["LAURA CASSANITI", "FORTECAR JUNIN"],
-        "1051": ["MARTIN GALOTTI", "FORTECAR OLAVARRIA"],
-        "784": ["GUSTAVO RIVAS", "GRANVILLE TRELEW"],
-        "899": ["ELIAS LANGONE", "FORTECAR TRENQUE LAUQUEN"],
-        "897": ["CONSTANZA NATTINO", "PAMPAWAGEN GENERAL PICO"],
-        "930": ["NICOLAS SCHNEIDER", "PAMPAWAGEN SANTA ROSA"],
-        "962": ["GONZALO EZEQUIEL TORRES", "GRANVILLE COMODORO"],
-        "1089": ["ANGEL AUGUSTO FRANCO", "GRANVILLE TRELEW"],
-        "1081": ["GASTON ACTIS", "PAMPAWAGEN SANTA ROSA"],
-        "596": ["MARINO JOAQUIN", "FORTECAR CHIVILCOY"],
-        "916": ["MATIAS NICOLAS JACCOUD", "FORTECAR PERGAMINO"],
-        "902": ["AGUSTINA BARRIOS", "FORTECAR OLAVARRIA"],
-        "1091": ["NORBERTO ALESSO", "FORTECAR PERGAMINO"],
-        "477": ["CARLOS MANFREDINI", "GRANVILLE SAN NICOLAS"],
-        "748": ["HERNAN MAXIMILIANO NOLASCO", "GRANVILLE PERGAMINO"],
-        "401": ["JOSE JUAN", "GRANVILLE JUNIN"],
-        "409": ["IGNACIO SOSA", "FORTECAR PERGAMINO"],
-        "774": ["CRISTIAN BRIGNANI", "FORTECAR CHIVILCOY"],
-        "913": ["NICOLAS MALDONADO", "FORTECAR SAN NICOLAS"],
-        "462": ["JORGE FERRAIUOLO", "FORTECAR JUNIN"],
-        "931": ["JUAN IGNACIO SORAIZ", "FORTECAR OLAVARRIA"],
-        "648": ["VALENTINA DIAZ REBICHINI", "PAMPAWAGEN GENERAL PICO"],
-        "977": ["OLIVIA ZUCARELLI", "OPENCARS JUNIN"],
-        "1004": ["JOSE LUIS CIARROCCHI", "FORTECAR JUNIN"],
-        "1097": ["NICOLAS CIALDO", "FORTECAR CHIVILCOY"],
-        "16": ["DANILO ROBLEDO", "GRANVILLE PERGAMINO"],
-        "1003": ["JUAN IGNACIO ARCE", "GRANVILLE JUNIN"],
-        "1048": ["BRUNO VIGNALE", "OPENCARS JUNIN"],
-        "961": ["FRANCO BRAVO", "FORTECAR OLAVARRIA"],
-        "751": ["SANTIAGO CARRERE", "GRANVILLE SAN NICOLAS"],
-        "1047": ["GISELL LLANOS", "GRANVILLE COMODORO"],
-        "1088": ["FRANCO VEGA", "GRANVILLE PERGAMINO"],
-        "402": ["CRISTIAN LOPEZ", "FORTECAR JUNIN"],
-        "1080": ["CRISTIAN ESCALANTE", "FORTECAR NUEVE DE JULIO"],
-        "1021": ["JUAN ANDRES BRIZUELA", "GRANVILLE COMODORO"],
-        "458": ["OSCAR TAVANI", "GRANVILLE SAN NICOLAS"],
-        "781": ["SILVANA CHAMINE", "GRANVILLE MADRYN"],
-        "1109": ["JULIETA DOWNES", "FORTECAR SAN NICOLAS"],
-        "476": ["POLIZZI PABLO ANDRES", "FORTECAR PERGAMINO"],
-        "950": ["SOFIA DIAMELA FERNANDEZ", "GRANVILLE JUNIN"],
-        "1099": ["GASTON SENOSEAIN", "PAMPAWAGEN SANTA ROSA"],
-        "1108": ["FLORENCIA HAESLER", "FORTECAR SAN NICOLAS"],
-        "968": ["RODRIGO JULIAN RIOS", "GRANVILLE MADRYN"],
-        "974": ["CIELO QUIROGA", "OPENCARS SAN NICOLAS"],
-        "786": ["RICHARD FORMANTEL ALBORNOZ", "GRANVILLE COMODORO"],
-        "601": ["SOSA JUAN CARLOS", "FORTECAR CHIVILCOY"],
-        "1104": ["CELIA FABIANA GONZALEZ", "GRANVILLE CITROEN SAN NICOLAS"],
-        "1050": ["MANUEL SORAIZ", "FORTECAR OLAVARRIA"],
-        "1100": ["CAMPODONICO MAGALI", "FORTECAR NUEVE DE JULIO"],
-        "1112": ["AGUSTINA AUZA", "GRANVILLE MADRYN"],
-        "1111": ["DAMIAN PARRONDO", "GRANVILLE MADRYN"],
-        "1101": ["RODRIGO BACCHIARRI", "GRANVILLE TRELEW"],
-        "SS": ["SANTIAGO SERVIDIA", "GRANVILLE MADRYN"],
-        "41": ["TOMAS DI NUCCI", "FORTECAR JUNIN"],
-        "414": ["CLAUDIO SANCHEZ", "RED SECUNDARIA"],
-        "986": ["RUBEN JORGE LARRIPA", "RED SECUNDARIA"],
-        "1031": ["ADRIAN FERNANDO SANCHEZ", "RED SECUNDARIA"],
-        "G": ["GERENCIA MARC AS", "GERENCIA"]
+        "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "GRANVILLE CITROEN SAN NICOLAS",
+        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", 
+        "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
+        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS", "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
+        "45 LAURA CASSANITI": "FORTECAR JUNIN", "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
+        "784 GUSTAVO RIVAS": "GRANVILLE TRELEW", "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
+        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO", "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
+        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO", "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
+        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA", "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
+        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
+        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
+        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", "401 JOSE JUAN": "GRANVILLE JUNIN",
+        "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+        "913 NICOLAS MALDONADO": "FORTECAR SAN NICOLAS", "462 JORGE FERRAIUOLO": "FORTECAR JUNIN", 
+        "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA", "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO", 
+        "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN", "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN", 
+        "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY", "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO", 
+        "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN", "1048 BRUNO VIGNALE": "OPENCARS JUNIN", 
+        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA", "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS", 
+        "1047 GISELL LLANOS": "GRANVILLE COMODORO", "1088 FRANCO VEGA": "GRANVILLE PERGAMINO", 
+        "402 CRISTIAN LOPEZ": "FORTECAR JUNIN", "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO", 
+        "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO", "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS", 
+        "781 SILVANA CHAMINE": "GRANVILLE MADRYN", "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN", 
+        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA", "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS", 
+        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN", "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS", 
+        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO", "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY", 
+        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS", "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA", 
+        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO", "1112 AGUSTINA AUZA": "GRANVILLE MADRYN", 
+        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN", "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
+        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
+        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
+        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA"
     }
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Subir U45", type=["xlsx","xls"], key="u45_fix_v2")
-    with c2: u53 = st.file_uploader("Subir U53", type=["xlsx","xls"], key="u53_fix_v2")
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx","xls"])
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx","xls"])
 
     if u45 and u53:
         try:
             df45 = pd.read_excel(u45)
             df53 = pd.read_excel(u53)
 
-            # --- Columnas ---
-            c_v45 = df45.columns[4]
+            def clean(t): return str(t).upper().strip()
+
+            # Columnas U45
+            c_v45 = df45.columns[4] # Vendedor
             c_t45 = next((c for c in df45.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e45 = next((c for c in df45.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo45 = next((c for c in df45.columns if "TAS. VO" in str(c).upper()), "TAS. VO")
             c_bk = "VENDEDOR COMPARTIDO"
 
-            c_v53_std = df53.columns[0] # Columna A
-            c_v53_virt = df53.columns[2] # Columna C (Vendedor para Virtuales)
+            # Columnas U53
+            c_v53_a = df53.columns[0] # Columna A
+            c_v53_c = df53.columns[2] # Columna C (Vendedor)
             c_e53 = next((c for c in df53.columns if "ESTAD" in str(c).upper()), "Estado")
 
-            res_final = []
+            final_list = []
 
-            # 1. PROCESAR ASESORES ESTÁNDAR (Por Legajo)
-            for legajo, datos in maestro_std.items():
-                # U45
-                m45 = (df45[c_e45] != 'A') & (df45[c_t45] != 'AC') & (df45[c_v45].astype(str).str.contains(legajo))
-                df_s45 = df45[m45]
-                # U53 (Columna A)
-                m53 = (df53[c_e53] != 'AN') & (df53[c_v53_std].astype(str).str.contains(legajo))
+            # --- PROCESAR ESTÁNDAR ---
+            for nom, suc in maestro_std.items():
+                # Filtro U45: Nombre debe estar en la columna de Vendedor
+                m45 = (df45[c_e45] != 'A') & (df45[c_t45] != 'AC') & (df45[c_v45].astype(str).str.contains(nom))
+                # Filtro U53: Nombre en Columna A
+                m53 = (df53[c_e53] != 'AN') & (df53[c_v53_a].astype(str).str.contains(nom))
                 
-                vn, vo = (df_s45[c_t45].isin(['O', 'OP'])).sum(), (df_s45[c_t45] == 'O2').sum()
-                pda, adj, ve = m53.sum(), (df_s45[c_t45] == 'PL').sum(), (df_s45[c_t45] == 'VE').sum()
-                toma = df_s45[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
+                df_fil = df45[m45]
+                pda = m53.sum()
+                vn = (df_fil[c_t45].isin(['O', 'OP'])).sum()
+                vo = (df_fil[c_t45] == 'O2').sum()
+                adj = (df_fil[c_t45] == 'PL').sum()
+                ve = (df_fil[c_t45] == 'VE').sum()
+                toma = df_fil[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
 
                 if (vn+vo+pda+adj+ve+toma) > 0:
-                    res_final.append({
-                        'Asesor': f"{legajo} {datos[0]}", 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 
-                        'VE': ve, 'TOMA_VO': toma, 'Sucursal': datos[1], 'EsVirtual': False
-                    })
+                    final_list.append({'Asesor': nom, 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 'VE': ve, 'TOMA_VO': toma, 'Sucursal': suc, 'Virtual': False})
 
-            # 2. PROCESAR VIRTUALES (Por Nombre en Columna BK y Columna C)
+            # --- PROCESAR VIRTUALES ---
             for v_nom in virtuales:
+                # Filtro U45: Nombre en Vendedor Compartido (BK)
                 m45_v = (df45[c_e45] != 'A') & (df45[c_bk].fillna('').str.upper().str.contains(v_nom))
-                df_v45 = df45[m45_v]
-                # PDA: COLUMNA C ÚNICAMENTE
-                m53_v = (df53[c_e53] != 'AN') & (df53[c_v53_virt].fillna('').str.upper().str.contains(v_nom))
+                # Filtro U53: Nombre en Columna C
+                m53_v = (df53[c_e53] != 'AN') & (df53[c_v53_c].fillna('').str.upper().str.contains(v_nom))
                 
-                vn, vo = (df_v45[c_t45].isin(['O', 'OP'])).sum(), (df_v45[c_t45] == 'O2').sum()
-                pda, adj, ve = m53_v.sum(), (df_v45[c_t45] == 'PL').sum(), (df_v45[c_t45] == 'VE').sum()
-                toma = df_v45[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
+                df_fil_v = df45[m45_v]
+                pda_v = m53_v.sum()
+                vn_v = (df_fil_v[c_t45].isin(['O', 'OP'])).sum()
+                vo_v = (df_fil_v[c_t45] == 'O2').sum()
+                adj_v = (df_fil_v[c_t45] == 'PL').sum()
+                ve_v = (df_fil_v[c_t45] == 'VE').sum()
+                toma_v = df_fil_v[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
 
-                if (vn+vo+pda+adj+ve+toma) > 0:
-                    res_final.append({
-                        'Asesor': v_nom, 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 
-                        'VE': ve, 'TOMA_VO': toma, 'Sucursal': 'SUCURSAL VIRTUAL', 'EsVirtual': True
-                    })
+                if (vn_v+vo_v+pda_v+adj_v+ve_v+toma_v) > 0:
+                    final_list.append({'Asesor': v_nom, 'VN': vn_v, 'VO': vo_v, 'PDA': pda_v, 'ADJ': adj_v, 'VE': ve_v, 'TOMA_VO': toma_v, 'Sucursal': 'SUCURSAL VIRTUAL', 'Virtual': True})
 
-            ranking = pd.DataFrame(res_final)
+            # Armar DataFrame
+            ranking = pd.DataFrame(final_list)
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['PDA'] + ranking['ADJ'] + ranking['VE']
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=False).reset_index(drop=True)
 
-            # --- MEDALLAS ---
-            def medallas(i):
+            # Ranking con Medallas
+            def get_rank(i):
                 if i == 0: return "🥇 1°"
                 if i == 1: return "🥈 2°"
                 if i == 2: return "🥉 3°"
                 return f"{i+1}°"
-            ranking.insert(0, 'Ranking', [medallas(i) for i in range(len(ranking))])
+            ranking.insert(0, 'Ranking', [get_rank(i) for i in range(len(ranking))])
 
-            # --- TOTALES (Excluyendo Virtuales) ---
-            stds = ranking[ranking['EsVirtual'] == False]
+            # TOTALES (Solo No Virtuales)
+            solo_std = ranking[ranking['Virtual'] == False]
             totales = pd.DataFrame({
-                'Ranking': [''], 'Asesor': ['TOTAL GENERAL'], 'VN': [stds['VN'].sum()], 'VO': [stds['VO'].sum()],
-                'PDA': [stds['PDA'].sum()], 'ADJ': [stds['ADJ'].sum()], 'VE': [stds['VE'].sum()],
-                'TOMA_VO': [stds['TOMA_VO'].sum()], 'TOTAL': [stds['TOTAL'].sum()], 'Sucursal': ['']
+                'Ranking': [''], 'Asesor': ['TOTAL GENERAL'], 
+                'VN': [solo_std['VN'].sum()], 'VO': [solo_std['VO'].sum()],
+                'PDA': [solo_std['PDA'].sum()], 'ADJ': [solo_std['ADJ'].sum()],
+                'VE': [solo_std['VE'].sum()], 'TOMA_VO': [solo_std['TOMA_VO'].sum()],
+                'TOTAL': [solo_std['TOTAL'].sum()], 'Sucursal': ['']
             })
 
-            col_order = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
-            df_final = pd.concat([ranking[col_order], totales], ignore_index=True).fillna('')
+            # Ordenar columnas
+            cols = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
+            res_fin = pd.concat([ranking[cols], totales], ignore_index=True).fillna('')
             
-            # Formato de números
+            # Limpiar enteros
             for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL']:
-                df_final[c] = df_final[c].apply(lambda x: int(x) if x != '' else '')
+                res_fin[c] = res_fin[c].apply(lambda x: int(x) if x != '' else '')
 
             st.write("### 🏆 Ranking Comercial Oficial")
-            st.dataframe(df_final, use_container_width=True, hide_index=True)
+            st.dataframe(res_fin, use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error técnico: {e}")
+            st.error(f"Error: {e}")
