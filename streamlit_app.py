@@ -154,16 +154,16 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING - RECONSTRUCCIÓN TOTAL SEGURA
+# OPCIÓN 2: RANKING - MOTOR DE BÚSQUEDA DUAL (PRO)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # 1. Los 9 Virtuales (Lógica: U45-BK y U53-Columna C)
+    # 1. Los 9 Virtuales (Lógica específica Columna C)
     virtuales = ["LEILA BRAVO", "FEDERICO RUBINO", "GERMAN CALVO", "JAZMIN BERAZATEGUI", 
                  "LUISANA LEDESMA", "CAMILA GARCIA", "CARLA VALLEJO", "PILAR ALCOBA", "ROCIO FERNANDEZ"]
 
-    # 2. Maestro Estándar (Lógica: Nombre exacto como estaba antes)
+    # 2. Maestro Estándar (Sucursales Físicas)
     maestro_std = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "GRANVILLE CITROEN SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", 
@@ -201,99 +201,98 @@ elif pagina == "Ranking de Asesores 🥇":
     }
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx","xls"])
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx","xls"])
+    with c1: u45 = st.file_uploader("Subir U45", type=["xlsx","xls"], key="u45_v10")
+    with c2: u53 = st.file_uploader("Subir U53", type=["xlsx","xls"], key="u53_v10")
 
     if u45 and u53:
         try:
             df45 = pd.read_excel(u45)
             df53 = pd.read_excel(u53)
 
-            def clean(t): return str(t).upper().strip()
-
-            # Columnas U45
-            c_v45 = df45.columns[4] # Vendedor
+            # Definición de Columnas U45
+            c_v45 = df45.columns[4]
             c_t45 = next((c for c in df45.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e45 = next((c for c in df45.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo45 = next((c for c in df45.columns if "TAS. VO" in str(c).upper()), "TAS. VO")
             c_bk = "VENDEDOR COMPARTIDO"
 
-            # Columnas U53
-            c_v53_a = df53.columns[0] # Columna A
-            c_v53_c = df53.columns[2] # Columna C (Vendedor)
+            # Definición de Columnas U53
+            c_v53_a = df53.columns[0] # Columna A (Estándar)
+            c_v53_c = df53.columns[2] # Columna C (Virtuales)
             c_e53 = next((c for c in df53.columns if "ESTAD" in str(c).upper()), "Estado")
 
-            final_list = []
+            res_final = []
 
-            # --- PROCESAR ESTÁNDAR ---
-            for nom, suc in maestro_std.items():
-                # Filtro U45: Nombre debe estar en la columna de Vendedor
-                m45 = (df45[c_e45] != 'A') & (df45[c_t45] != 'AC') & (df45[c_v45].astype(str).str.contains(nom))
-                # Filtro U53: Nombre en Columna A
-                m53 = (df53[c_e53] != 'AN') & (df53[c_v53_a].astype(str).str.contains(nom))
+            # --- 1. PROCESAR ASESORES ESTÁNDAR ---
+            for nom_completo, sucursal in maestro_std.items():
+                # Extraemos solo el nombre (sin el número) para una búsqueda más flexible
+                solo_nombre = " ".join(nom_completo.split()[1:]) if nom_completo[0].isdigit() else nom_completo
                 
-                df_fil = df45[m45]
+                # Búsqueda en U45 (por nombre completo o parte)
+                m45 = (df45[c_e45] != 'A') & (df45[c_t45] != 'AC') & (df45[c_v45].astype(str).str.upper().str.contains(solo_nombre.upper()))
+                # Búsqueda en U53 COLUMNA A (PDA)
+                m53 = (df53[c_e53] != 'AN') & (df53[c_v53_a].astype(str).str.upper().str.contains(solo_nombre.upper()))
+                
+                df_f45 = df45[m45]
+                vn = (df_f45[c_t45].isin(['O', 'OP'])).sum()
+                vo = (df_f45[c_t45] == 'O2').sum()
                 pda = m53.sum()
-                vn = (df_fil[c_t45].isin(['O', 'OP'])).sum()
-                vo = (df_fil[c_t45] == 'O2').sum()
-                adj = (df_fil[c_t45] == 'PL').sum()
-                ve = (df_fil[c_t45] == 'VE').sum()
-                toma = df_fil[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
+                adj = (df_f45[c_t45] == 'PL').sum()
+                ve = (df_f45[c_t45] == 'VE').sum()
+                toma = df_f45[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
 
                 if (vn+vo+pda+adj+ve+toma) > 0:
-                    final_list.append({'Asesor': nom, 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 'VE': ve, 'TOMA_VO': toma, 'Sucursal': suc, 'Virtual': False})
+                    res_final.append({'Asesor': nom_completo, 'VN': vn, 'VO': vo, 'PDA': pda, 'ADJ': adj, 'VE': ve, 'TOMA_VO': toma, 'Sucursal': sucursal, 'EsVirtual': False})
 
-            # --- PROCESAR VIRTUALES ---
-            for v_nom in virtuales:
-                # Filtro U45: Nombre en Vendedor Compartido (BK)
-                m45_v = (df45[c_e45] != 'A') & (df45[c_bk].fillna('').str.upper().str.contains(v_nom))
-                # Filtro U53: Nombre en Columna C
-                m53_v = (df53[c_e53] != 'AN') & (df53[c_v53_c].fillna('').str.upper().str.contains(v_nom))
+            # --- 2. PROCESAR VIRTUALES (AISLADOS) ---
+            for v in virtuales:
+                # Búsqueda en U45 COLUMNA BK
+                m45_v = (df45[c_e45] != 'A') & (df45[c_bk].fillna('').str.upper().str.contains(v))
+                # Búsqueda en U53 COLUMNA C ÚNICAMENTE (PDA)
+                m53_v = (df53[c_e53] != 'AN') & (df53[c_v53_c].fillna('').astype(str).str.upper().str.contains(v))
                 
-                df_fil_v = df45[m45_v]
+                df_fv = df45[m45_v]
+                vn_v = (df_fv[c_t45].isin(['O', 'OP'])).sum()
+                vo_v = (df_fv[c_t45] == 'O2').sum()
                 pda_v = m53_v.sum()
-                vn_v = (df_fil_v[c_t45].isin(['O', 'OP'])).sum()
-                vo_v = (df_fil_v[c_t45] == 'O2').sum()
-                adj_v = (df_fil_v[c_t45] == 'PL').sum()
-                ve_v = (df_fil_v[c_t45] == 'VE').sum()
-                toma_v = df_fil_v[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
+                adj_v = (df_fv[c_t45] == 'PL').sum()
+                ve_v = (df_fv[c_t45] == 'VE').sum()
+                toma_v = df_fv[c_vo45].apply(lambda x: 1 if str(x).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum()
 
                 if (vn_v+vo_v+pda_v+adj_v+ve_v+toma_v) > 0:
-                    final_list.append({'Asesor': v_nom, 'VN': vn_v, 'VO': vo_v, 'PDA': pda_v, 'ADJ': adj_v, 'VE': ve_v, 'TOMA_VO': toma_v, 'Sucursal': 'SUCURSAL VIRTUAL', 'Virtual': True})
+                    res_final.append({'Asesor': v, 'VN': vn_v, 'VO': vo_v, 'PDA': pda_v, 'ADJ': adj_v, 'VE': ve_v, 'TOMA_VO': toma_v, 'Sucursal': 'SUCURSAL VIRTUAL', 'EsVirtual': True})
 
-            # Armar DataFrame
-            ranking = pd.DataFrame(final_list)
-            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['PDA'] + ranking['ADJ'] + ranking['VE']
-            ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=False).reset_index(drop=True)
+            # Generar Ranking
+            df_rank = pd.DataFrame(res_final)
+            df_rank['TOTAL'] = df_rank['VN'] + df_rank['VO'] + df_rank['PDA'] + df_rank['ADJ'] + df_rank['VE']
+            df_rank = df_rank.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=False).reset_index(drop=True)
 
-            # Ranking con Medallas
-            def get_rank(i):
+            # Emojis de Ranking
+            def get_emoji(i):
                 if i == 0: return "🥇 1°"
-                if i == 1: return "🥈 2°"
-                if i == 2: return "🥉 3°"
-                return f"{i+1}°"
-            ranking.insert(0, 'Ranking', [get_rank(i) for i in range(len(ranking))])
+                elif i == 1: return "🥈 2°"
+                elif i == 2: return "🥉 3°"
+                else: return f"{i+1}°"
+            df_rank.insert(0, 'Ranking', [get_emoji(i) for i in range(len(df_rank))])
 
-            # TOTALES (Solo No Virtuales)
-            solo_std = ranking[ranking['Virtual'] == False]
+            # TOTALES (Solo Asesores Físicos)
+            stds = df_rank[df_rank['EsVirtual'] == False]
             totales = pd.DataFrame({
-                'Ranking': [''], 'Asesor': ['TOTAL GENERAL'], 
-                'VN': [solo_std['VN'].sum()], 'VO': [solo_std['VO'].sum()],
-                'PDA': [solo_std['PDA'].sum()], 'ADJ': [solo_std['ADJ'].sum()],
-                'VE': [solo_std['VE'].sum()], 'TOMA_VO': [solo_std['TOMA_VO'].sum()],
-                'TOTAL': [solo_std['TOTAL'].sum()], 'Sucursal': ['']
+                'Ranking': [''], 'Asesor': ['TOTAL GENERAL'], 'VN': [stds['VN'].sum()], 'VO': [stds['VO'].sum()],
+                'PDA': [stds['PDA'].sum()], 'ADJ': [stds['ADJ'].sum()], 'VE': [stds['VE'].sum()],
+                'TOMA_VO': [stds['TOMA_VO'].sum()], 'TOTAL': [stds['TOTAL'].sum()], 'Sucursal': ['']
             })
 
-            # Ordenar columnas
-            cols = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
-            res_fin = pd.concat([ranking[cols], totales], ignore_index=True).fillna('')
+            # Orden Final
+            cols_final = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
+            resultado = pd.concat([df_rank[cols_final], totales], ignore_index=True).fillna('')
             
-            # Limpiar enteros
+            # Formateo de números a enteros
             for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL']:
-                res_fin[c] = res_fin[c].apply(lambda x: int(x) if x != '' else '')
+                resultado[c] = resultado[c].apply(lambda x: int(x) if x != '' else '')
 
             st.write("### 🏆 Ranking Comercial Oficial")
-            st.dataframe(res_fin, use_container_width=True, hide_index=True)
+            st.dataframe(resultado, use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error técnico detectado: {e}")
