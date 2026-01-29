@@ -154,13 +154,13 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES - VERSIÓN FINAL CORREGIDA
+# OPCIÓN 2: RANKING CORREGIDO (ORDEN Y PDA VIRTUALES)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # --- MAESTRO DE ASESORES (Formato Estándar) ---
-    maestro_asesores = {
+    # --- MAESTRO DE ASESORES ---
+    maestro_std = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "GRANVILLE CITROEN SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", 
         "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
@@ -179,7 +179,7 @@ elif pagina == "Ranking de Asesores 🥇":
         "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN", "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN", 
         "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY", "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO", 
         "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN", "1048 BRUNO VIGNALE": "OPENCARS JUNIN", 
-        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA", "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS", 
+        "961 FRANCO BRAVE": "FORTECAR OLAVARRIA", "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS", 
         "1047 GISELL LLANOS": "GRANVILLE COMODORO", "1088 FRANCO VEGA": "GRANVILLE PERGAMINO", 
         "402 CRISTIAN LOPEZ": "FORTECAR JUNIN", "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO", 
         "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO", "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS", 
@@ -200,8 +200,8 @@ elif pagina == "Ranking de Asesores 🥇":
                  "LUISANA LEDESMA", "CAMILA GARCIA", "CARLA VALLEJO", "PILAR ALCOBA", "ROCIO FERNANDEZ"]
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Subir U45", type=["xlsx","xls"], key="u45_f")
-    with c2: u53 = st.file_uploader("Subir U53", type=["xlsx","xls"], key="u53_f")
+    with c1: u45 = st.file_uploader("Subir U45", type=["xlsx","xls"], key="u45_v5")
+    with c2: u53 = st.file_uploader("Subir U53", type=["xlsx","xls"], key="u53_v5")
 
     if u45 and u53:
         try:
@@ -217,72 +217,71 @@ elif pagina == "Ranking de Asesores 🥇":
             c_vo_45 = next((c for c in df45.columns if "TAS. VO" in str(c).upper()), "TAS. VO")
             c_bk_45 = "VENDEDOR COMPARTIDO"
 
-            c_v_53 = df53.columns[2] # Columna C (Vendedor Virtuales)
-            c_id_53 = df53.columns[0] # Columna A (Vendedor Estándar)
+            c_v_53 = df53.columns[2] # Columna C (Vendedor para Virtuales)
+            c_id_53 = df53.columns[0] # Columna A (Vendedor para Estándar)
             c_e_53 = next((c for c in df53.columns if "ESTAD" in str(c).upper()), "Estado")
 
             res_final = []
 
-            # A. PROCESAR ESTÁNDAR
-            for nom_maestro, sucursal in maestro_asesores.items():
+            # 1. PROCESAR ESTÁNDAR
+            for nom_maestro, sucursal in maestro_std.items():
                 nom_limpio = f_limpiar(nom_maestro)
-                
-                # U45: Filtro exacto por Vendedor Principal
-                m45 = (df45[c_e_45] != 'A') & (df45[c_t_45] != 'AC') & (df45[c_v_45].apply(f_limpiar) == nom_limpio)
-                df_filtro45 = df45[m45]
-                
-                # U53: Filtro exacto por Columna A
-                m53 = (df53[c_e_53] != 'AN') & (df53[c_id_53].apply(f_limpiar) == nom_limpio)
+                m45 = (df45[c_e_45] != 'A') & (df45[c_t_45] != 'AC') & (df45[c_v_45].astype(str).apply(f_limpiar).str.contains(nom_limpio))
+                df_f45 = df45[m45]
+                m53 = (df53[c_e_53] != 'AN') & (df53[c_id_53].astype(str).apply(f_limpiar).str.contains(nom_limpio))
                 pda_v = m53.sum()
 
-                if len(df_filtro45) > 0 or pda_v > 0:
+                if len(df_f45) > 0 or pda_v > 0:
                     res_final.append({
-                        'Asesor': nom_maestro, 'VN': (df_filtro45[c_t_45].isin(['O', 'OP'])).sum(),
-                        'VO': (df_filtro45[c_t_45] == 'O2').sum(), 'PDA': pda_v,
-                        'ADJ': (df_filtro45[c_t_45] == 'PL').sum(), 'VE': (df_filtro45[c_t_45] == 'VE').sum(),
-                        'TOMA_VO': df_filtro45[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum(),
+                        'Asesor': nom_maestro, 'VN': (df_f45[c_t_45].isin(['O', 'OP'])).sum(),
+                        'VO': (df_f45[c_t_45] == 'O2').sum(), 'PDA': pda_v,
+                        'ADJ': (df_f45[c_t_45] == 'PL').sum(), 'VE': (df_f45[c_t_45] == 'VE').sum(),
+                        'TOMA_VO': df_f45[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum(),
                         'Sucursal': sucursal, 'EsVirtual': False
                     })
 
-            # B. PROCESAR VIRTUALES
+            # 2. PROCESAR VIRTUALES
             for v_nom in virtuales:
                 v_limpio = f_limpiar(v_nom)
-                
-                # U45: Búsqueda en VENDEDOR COMPARTIDO (BK)
                 m45_v = (df45[c_e_45] != 'A') & (df45[c_bk_45].fillna('').apply(f_limpiar).str.contains(v_limpio))
-                df_filtro45_v = df45[m45_v]
-                
-                # U53: Búsqueda en Vendedor (Columna C)
-                m53_v = (df53[c_e_53] != 'AN') & (df53[c_v_53].fillna('').apply(f_limpiar).str.contains(v_limpio))
+                df_f45_v = df45[m45_v]
+                # Búsqueda específica en Columna C del U53
+                m53_v = (df53[c_e_53] != 'AN') & (df53[c_v_53].fillna('').astype(str).apply(f_limpiar).str.contains(v_limpio))
                 pda_v_v = m53_v.sum()
 
-                if len(df_filtro45_v) > 0 or pda_v_v > 0:
+                if len(df_f45_v) > 0 or pda_v_v > 0:
                     res_final.append({
-                        'Asesor': v_nom, 'VN': (df_filtro45_v[c_t_45].isin(['O', 'OP'])).sum(),
-                        'VO': (df_filtro45_v[c_t_45] == 'O2').sum(), 'PDA': pda_v_v,
-                        'ADJ': (df_filtro45_v[c_t_45] == 'PL').sum(), 'VE': (df_filtro45_v[c_t_45] == 'VE').sum(),
-                        'TOMA_VO': df_filtro45_v[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum(),
+                        'Asesor': v_nom, 'VN': (df_f45_v[c_t_45].isin(['O', 'OP'])).sum(),
+                        'VO': (df_f45_v[c_t_45] == 'O2').sum(), 'PDA': pda_v_v,
+                        'ADJ': (df_f45_v[c_t_45] == 'PL').sum(), 'VE': (df_f45_v[c_f45_v[c_t_45] == 'VE']).sum() if 'VE' in df_f45_v[c_t_45].values else 0,
+                        'TOMA_VO': df_f45_v[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', '', '0,0'] else 0).sum(),
                         'Sucursal': 'SUCURSAL VIRTUAL', 'EsVirtual': True
                     })
 
             ranking = pd.DataFrame(res_final)
+            ranking = ranking.fillna(0)
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['PDA'] + ranking['ADJ'] + ranking['VE']
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=False).reset_index(drop=True)
 
-            # --- TOTALES (Solo No Virtuales) ---
+            # --- TOTALES (Excluyendo Virtuales) ---
             std_only = ranking[ranking['EsVirtual'] == False]
             totales = pd.DataFrame({
                 'Asesor': ['TOTAL GENERAL'], 'VN': [std_only['VN'].sum()], 'VO': [std_only['VO'].sum()],
                 'PDA': [std_only['PDA'].sum()], 'ADJ': [std_only['ADJ'].sum()], 'VE': [std_only['VE'].sum()],
-                'TOTAL': [std_only['TOTAL'].sum()], 'TOMA_VO': [std_only['TOMA_VO'].sum()], 'Sucursal': ['']
+                'TOMA_VO': [std_only['TOMA_VO'].sum()], 'TOTAL': [std_only['TOTAL'].sum()], 'Sucursal': ['']
             })
 
-            # Formateo
+            # Reordenar Columnas: Ranking, Asesor, VN, VO, PDA, ADJ, VE, TOMA_VO, TOTAL, Sucursal
             ranking.insert(0, 'Ranking', [f"{i+1}°" for i in range(len(ranking))])
-            df_mostrar = pd.concat([ranking.drop(columns=['EsVirtual']), totales], ignore_index=True).fillna('')
+            columnas_orden = ['Ranking', 'Asesor', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL', 'Sucursal']
             
+            df_mostrar = pd.concat([ranking[columnas_orden], totales], ignore_index=True).fillna('')
+            
+            for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO', 'TOTAL']:
+                df_mostrar[c] = df_mostrar[c].apply(lambda x: int(x) if x != '' else '')
+
             st.write("### 🏆 Ranking Comercial Oficial")
             st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error en el cálculo: {e}")
+            st.error(f"Error: {e}")
