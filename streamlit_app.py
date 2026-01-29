@@ -154,12 +154,12 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (DETECCIÓN INFALIBLE)
+# OPCIÓN 2: RANKING DE ASESORES (CORREGIDO Y SIN DECIMALES)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # --- MAESTRO DE ASESORES ---
+    # --- MAESTRO DE ASESORES (SINTAXIS CORREGIDA) ---
     maestro_asesores = {
         "1115": ["1115 JORGE ZORRO", "GRANVILLE TRELEW"],
         "1114": ["1114 FACUNDO BOTAZZI", "GRANVILLE CITROEN SAN NICOLAS"],
@@ -219,7 +219,7 @@ elif pagina == "Ranking de Asesores 🥇":
         "1050": ["1050 MANUEL SORAIZ", "FORTECAR OLAVARRIA"],
         "1100": ["1100 CAMPODONICO MAGALI", "FORTECAR NUEVE DE JULIO"],
         "1112": ["1112 AGUSTINA AUZA", "GRANVILLE MADRYN"],
-        "1111": ["1111 DAMIAN PARRONDO": "GRANVILLE MADRYN"],
+        "1111": ["1111 DAMIAN PARRONDO", "GRANVILLE MADRYN"], # <-- Coma corregida aquí
         "1101": ["1101 RODRIGO BACCHIARRI", "GRANVILLE TRELEW"],
         "41": ["41 TOMAS DI NUCCI", "FORTECAR JUNIN"],
         "414": ["414 CLAUDIO SANCHEZ", "RED SECUNDARIA"],
@@ -251,11 +251,11 @@ elif pagina == "Ranking de Asesores 🥇":
             df45['KEY'] = df45[c_v_45].astype(str).str.upper()
 
             u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
-                'VN': (x[c_t_45].isin(['O', 'OP'])).sum(),
-                'VO': (x[c_t_45] == 'O2').sum(),
-                'ADJ': (x[c_t_45] == 'PL').sum(),
-                'VE': (x[c_t_45] == 'VE').sum(),
-                'TOMA_VO': x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum() if c_vo_45 else 0
+                'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
+                'VO': int((x[c_t_45] == 'O2').sum()),
+                'ADJ': int((x[c_t_45] == 'PL').sum()),
+                'VE': int((x[c_t_45] == 'VE').sum()),
+                'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
             })).reset_index()
 
             c_v_53 = df53_raw.columns[0]
@@ -265,15 +265,18 @@ elif pagina == "Ranking de Asesores 🥇":
 
             ranking_raw = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             
-            # --- NUEVA LÓGICA DE ASIGNACIÓN POR CÓDIGO (INFALIBLE) ---
             def asignar_datos(nombre_excel):
                 for codigo, datos in maestro_asesores.items():
-                    if codigo in nombre_excel: # Si el número "1090" está en la celda...
-                        return datos[0], datos[1] # Devuelve Nombre Completo y Sucursal
+                    if codigo in nombre_excel:
+                        return datos[0], datos[1]
                 return None, None
 
             ranking_raw[['Asesor_Oficial', 'Sucursal']] = ranking_raw['KEY'].apply(lambda x: pd.Series(asignar_datos(x)))
             ranking = ranking_raw.dropna(subset=['Asesor_Oficial']).copy()
+
+            # Asegurar enteros
+            cols_num = ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']
+            ranking[cols_num] = ranking[cols_num].astype(int)
 
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
@@ -281,10 +284,10 @@ elif pagina == "Ranking de Asesores 🥇":
             # --- TOTALES ---
             totales = pd.DataFrame({
                 'Ranking': [''], 'Asesor': ['TOTAL GENERAL'],
-                'VN': [ranking['VN'].sum()], 'VO': [ranking['VO'].sum()],
-                'PDA': [ranking['PDA'].sum()], 'ADJ': [ranking['ADJ'].sum()],
-                'VE': [ranking['VE'].sum()], 'TOTAL': [ranking['TOTAL'].sum()],
-                'TOMA_VO': [ranking['TOMA_VO'].sum()], 'Sucursal': ['']
+                'VN': [int(ranking['VN'].sum())], 'VO': [int(ranking['VO'].sum())],
+                'PDA': [int(ranking['PDA'].sum())], 'ADJ': [int(ranking['ADJ'].sum())],
+                'VE': [int(ranking['VE'].sum())], 'TOTAL': [int(ranking['TOTAL'].sum())],
+                'TOMA_VO': [int(ranking['TOMA_VO'].sum())], 'Sucursal': ['']
             })
 
             ranking.insert(0, 'Rank_Icon', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
