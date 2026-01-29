@@ -154,90 +154,55 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (ACTUALIZADO CON NUEVOS ASESORES)
+# OPCIÓN 2: RANKING DE ASESORES (CON FILA DE TOTALES)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # --- MAESTRO DE ASESORES ACTUALIZADO ---
+    # --- MAESTRO DE ASESORES (Incluyendo los nuevos) ---
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW",
         "1114 FACUNDO BOTAZZI": "GRANVILLE CITROEN SAN NICOLAS",
         "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", 
         "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA",
-        "LEILA BRAVO": "SUCURSAL VIRTUAL", 
-        "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
-        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS", 
-        "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
-        "45 LAURA CASSANITI": "FORTECAR JUNIN", 
-        "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
-        "FEDERICO RUBINO": "SUCURSAL VIRTUAL", 
-        "784 GUSTAVO RIVAS": "GRANVILLE TRELEW",
-        "GERMAN CALVO": "SUCURSAL VIRTUAL", 
-        "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
-        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO", 
-        "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
-        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO", 
-        "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
-        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA", 
-        "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
-        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", 
-        "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL",
-        "LUISANA LEDESMA": "SUCURSAL VIRTUAL", 
-        "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
-        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", 
-        "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
-        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", 
-        "401 JOSE JUAN": "GRANVILLE JUNIN",
-        "409 IGNACIO SOSA": "FORTECAR PERGAMINO", 
-        "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
-        "913 NICOLAS MALDONADO": "FORTECAR SAN NICOLAS", 
-        "CAMILA GARCIA": "SUCURSAL VIRTUAL",
-        "462 JORGE FERRAIUOLO": "FORTECAR JUNIN", 
-        "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA",
-        "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO", 
-        "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN",
-        "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN", 
-        "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY",
-        "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO", 
-        "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN",
-        "1048 BRUNO VIGNALE": "OPENCARS JUNIN", 
-        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA",
-        "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS", 
-        "1047 GISELL LLANOS": "GRANVILLE COMODORO",
-        "1088 FRANCO VEGA": "GRANVILLE PERGAMINO", 
-        "402 CRISTIAN LOPEZ": "FORTECAR JUNIN",
-        "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO", 
-        "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO",
-        "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS", 
-        "CARLA VALLEJO": "SUCURSAL VIRTUAL",
-        "PILAR ALCOBA": "SUCURSAL VIRTUAL", 
-        "781 SILVANA CHAMINE": "GRANVILLE MADRYN",
-        "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL", 
-        "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
-        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", 
-        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN",
-        "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN", 
-        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA",
-        "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS", 
-        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN",
-        "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS", 
-        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO",
-        "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY", 
-        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS",
-        "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA", 
-        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO",
-        "1112 AGUSTINA AUZA": "GRANVILLE MADRYN", 
-        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN",
-        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL", 
-        "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
-        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", 
-        "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
-        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", 
-        "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
-        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", 
-        "G GERENCIA MARC AS": "GERENCIA"
+        "LEILA BRAVO": "SUCURSAL VIRTUAL", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
+        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS", "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
+        "45 LAURA CASSANITI": "FORTECAR JUNIN", "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
+        "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "784 GUSTAVO RIVAS": "GRANVILLE TRELEW",
+        "GERMAN CALVO": "SUCURSAL VIRTUAL", "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
+        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO", "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
+        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO", "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
+        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA", "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
+        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL",
+        "LUISANA LEDESMA": "SUCURSAL VIRTUAL", "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
+        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
+        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", "401 JOSE JUAN": "GRANVILLE JUNIN",
+        "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+        "913 NICOLAS MALDONADO": "FORTECAR SAN NICOLAS", "CAMILA GARCIA": "SUCURSAL VIRTUAL",
+        "462 JORGE FERRAIUOLO": "FORTECAR JUNIN", "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA",
+        "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO", "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN",
+        "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN", "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY",
+        "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO", "1003 JUAN IGNACIO ARCE": "GRANVILLE JUNIN",
+        "1048 BRUNO VIGNALE": "OPENCARS JUNIN", "961 FRANCO BRAVO": "FORTECAR OLAVARRIA",
+        "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS", "1047 GISELL LLANOS": "GRANVILLE COMODORO",
+        "1088 FRANCO VEGA": "GRANVILLE PERGAMINO", "402 CRISTIAN LOPEZ": "FORTECAR JUNIN",
+        "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO", "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO",
+        "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
+        "PILAR ALCOBA": "SUCURSAL VIRTUAL", "781 SILVANA CHAMINE": "GRANVILLE MADRYN",
+        "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL", "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN",
+        "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN", "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA",
+        "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS", "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN",
+        "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS", "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO",
+        "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY", "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS",
+        "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA", "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO",
+        "1112 AGUSTINA AUZA": "GRANVILLE MADRYN", "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN",
+        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL", "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
+        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
+        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
+        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA"
     }
+
     c1, c2 = st.columns(2)
     with c1:
         u45 = st.file_uploader("Archivo U45 (Ventas)", type=["xlsx", "xls", "csv"], key="u45_key")
@@ -247,15 +212,12 @@ elif pagina == "Ranking de Asesores 🥇":
     if u45 and u53:
         try:
             def leer_archivo(file):
-                if file.name.endswith('.csv'):
-                    return pd.read_csv(file)
+                if file.name.endswith('.csv'): return pd.read_csv(file)
                 return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
 
-            # --- CARGAR Y LIMPIAR ---
             df45_raw = leer_archivo(u45)
             df53_raw = leer_archivo(u53)
 
-            # --- PROCESAR U45 ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -272,7 +234,6 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum() if c_vo_45 else 0
             })).reset_index()
 
-            # --- PROCESAR U53 ---
             c_v_53 = df53_raw.columns[0]
             c_e_53 = next((c for c in df53_raw.columns if "ESTADO" in str(c).upper()), "Estado")
             df53 = df53_raw.copy()
@@ -281,26 +242,39 @@ elif pagina == "Ranking de Asesores 🥇":
             df53['KEY'] = df53[c_v_53].astype(str).str.strip().str.upper()
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-            # --- CONSOLIDACIÓN ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
-            
-            # FILTRO CRUCIAL: Solo tomamos asesores que están en tu Maestro
-            # Si el asesor no está en la lista, el resultado del .map será NaN
             ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores)
-            
-            # Eliminamos cualquier fila donde la sucursal sea NaN (es decir, no estaba en el maestro)
             ranking = ranking.dropna(subset=['Sucursal'])
             
-            # Filtro adicional por si el nombre dice explícitamente "CONFIRMAR"
             excluir = ["A CONFIRMAR", "NO CONFIRMADO", "SIN ASIGNAR", "NO CONFIRMADA"]
             ranking = ranking[~ranking['KEY'].isin(excluir)]
 
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
-            ranking.insert(0, 'Ranking', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+            
+            # --- CÁLCULO DE FILA TOTAL ---
+            totales = pd.DataFrame({
+                'Ranking': [''],
+                'KEY': ['TOTAL GENERAL'],
+                'VN': [ranking['VN'].sum()],
+                'VO': [ranking['VO'].sum()],
+                'PDA': [ranking['PDA'].sum()],
+                'ADJ': [ranking['ADJ'].sum()],
+                'VE': [ranking['VE'].sum()],
+                'TOTAL': [ranking['TOTAL'].sum()],
+                'TOMA_VO': [ranking['TOMA_VO'].sum()],
+                'Sucursal': ['']
+            })
+
+            # Formatear el ranking con medallas
+            ranking.insert(0, 'Ranking_icon', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+            ranking_display = ranking[['Ranking_icon', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'Ranking_icon': 'Ranking'})
+            
+            # Unir ranking con la fila de totales
+            ranking_final = pd.concat([ranking_display, totales], ignore_index=True)
 
             st.write("### 🏆 Ranking Comercial Oficial")
-            st.dataframe(ranking[['Ranking', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY':'Asesor'}), 
+            st.dataframe(ranking_final.rename(columns={'KEY':'Asesor'}), 
                          use_container_width=True, hide_index=True)
 
         except Exception as e:
