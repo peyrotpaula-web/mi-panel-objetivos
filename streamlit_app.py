@@ -154,15 +154,16 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (CON FILA DE TOTALES)
+# OPCIÓN 2: RANKING DE ASESORES (CORRECCIÓN FACUNDO BLAIOTTA)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # --- MAESTRO DE ASESORES (Incluyendo los nuevos) ---
+    # --- MAESTRO DE ASESORES (Actualizado y verificado) ---
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW",
         "1114 FACUNDO BOTAZZI": "GRANVILLE CITROEN SAN NICOLAS",
+        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", # <--- Verificado aquí
         "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN", 
         "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA",
         "LEILA BRAVO": "SUCURSAL VIRTUAL", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
@@ -190,17 +191,17 @@ elif pagina == "Ranking de Asesores 🥇":
         "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
         "PILAR ALCOBA": "SUCURSAL VIRTUAL", "781 SILVANA CHAMINE": "GRANVILLE MADRYN",
         "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL", "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
-        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN",
-        "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN", "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA",
-        "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS", "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN",
-        "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS", "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO",
-        "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY", "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS",
-        "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA", "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO",
-        "1112 AGUSTINA AUZA": "GRANVILLE MADRYN", "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN",
-        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL", "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
-        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
-        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
-        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA"
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN",
+        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA", "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS",
+        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN", "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS",
+        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO", "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY",
+        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS", "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA",
+        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO", "1112 AGUSTINA AUZA": "GRANVILLE MADRYN",
+        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN", "564 GOMEZ URIEL": "SUCURSAL VIRTUAL",
+        "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW", "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN",
+        "41 TOMAS DI NUCCI": "FORTECAR JUNIN", "414 CLAUDIO SANCHEZ": "RED SECUNDARIA",
+        "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA", "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA",
+        "G GERENCIA MARC AS": "GERENCIA"
     }
 
     c1, c2 = st.columns(2)
@@ -224,7 +225,9 @@ elif pagina == "Ranking de Asesores 🥇":
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
             df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
-            df45['KEY'] = df45[c_v_45].astype(str).str.strip().str.upper()
+            
+            # --- LIMPIEZA DE KEY (Elimina espacios dobles) ---
+            df45['KEY'] = df45[c_v_45].astype(str).apply(lambda x: " ".join(x.split())).str.strip().str.upper()
 
             u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': (x[c_t_45].isin(['O', 'OP'])).sum(),
@@ -239,11 +242,17 @@ elif pagina == "Ranking de Asesores 🥇":
             df53 = df53_raw.copy()
             if c_e_53 in df53.columns:
                 df53 = df53[df53[c_e_53] != 'AN']
-            df53['KEY'] = df53[c_v_53].astype(str).str.strip().str.upper()
+            
+            # --- LIMPIEZA DE KEY (U53) ---
+            df53['KEY'] = df53[c_v_53].astype(str).apply(lambda x: " ".join(x.split())).str.strip().str.upper()
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
-            ranking['Sucursal'] = ranking['KEY'].map(maestro_asesores)
+            
+            # Limpiar también las llaves del maestro por seguridad
+            maestro_limpio = { " ".join(k.split()).upper() : v for k, v in maestro_asesores.items() }
+            ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
+            
             ranking = ranking.dropna(subset=['Sucursal'])
             
             excluir = ["A CONFIRMAR", "NO CONFIRMADO", "SIN ASIGNAR", "NO CONFIRMADA"]
@@ -252,10 +261,10 @@ elif pagina == "Ranking de Asesores 🥇":
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
             ranking = ranking.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
             
-            # --- CÁLCULO DE FILA TOTAL ---
+            # --- FILA DE TOTALES ---
             totales = pd.DataFrame({
                 'Ranking': [''],
-                'KEY': ['TOTAL GENERAL'],
+                'Asesor': ['TOTAL GENERAL'],
                 'VN': [ranking['VN'].sum()],
                 'VO': [ranking['VO'].sum()],
                 'PDA': [ranking['PDA'].sum()],
@@ -266,16 +275,13 @@ elif pagina == "Ranking de Asesores 🥇":
                 'Sucursal': ['']
             })
 
-            # Formatear el ranking con medallas
             ranking.insert(0, 'Ranking_icon', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
-            ranking_display = ranking[['Ranking_icon', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'Ranking_icon': 'Ranking'})
+            ranking_display = ranking[['Ranking_icon', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'Ranking_icon': 'Ranking', 'KEY': 'Asesor'})
             
-            # Unir ranking con la fila de totales
             ranking_final = pd.concat([ranking_display, totales], ignore_index=True)
 
             st.write("### 🏆 Ranking Comercial Oficial")
-            st.dataframe(ranking_final.rename(columns={'KEY':'Asesor'}), 
-                         use_container_width=True, hide_index=True)
+            st.dataframe(ranking_final, use_container_width=True, hide_index=True)
 
         except Exception as e:
             st.error(f"Error en el procesamiento: {e}")
