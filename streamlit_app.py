@@ -229,17 +229,7 @@ elif pagina == "Ranking de Asesores 🥇":
         "G GERENCIA MARC AS": "GERENCIA",
         "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO",
         "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
-        # --- Se mantienen virtuales por si aparecen en los archivos ---
-        "LEILA BRAVO": "SUCURSAL VIRTUAL",
-        "FEDERICO RUBINO": "SUCURSAL VIRTUAL",
-        "GERMAN CALVO": "SUCURSAL VIRTUAL",
-        "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL",
-        "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
-        "CAMILA GARCIA": "SUCURSAL VIRTUAL",
-        "CARLA VALLEJO": "SUCURSAL VIRTUAL",
-        "PILAR ALCOBA": "SUCURSAL VIRTUAL",
-        "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL",
-        "564 GOMEZ URIEL": "SUCURSAL VIRTUAL"
+        
     }
 
     c1, c2 = st.columns(2)
