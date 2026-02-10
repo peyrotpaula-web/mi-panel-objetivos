@@ -229,7 +229,9 @@ elif pagina == "Ranking de Asesores 🥇":
         "G GERENCIA MARC AS": "GERENCIA",
         "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO",
         "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
-        
+        "1119 ROMAN GAVINO": "FORTECAR NUEVE DE JULIO",
+        "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
+
     }
 
     c1, c2 = st.columns(2)
