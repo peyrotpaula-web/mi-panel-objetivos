@@ -220,7 +220,7 @@ elif pagina == "Ranking de Asesores 🥇":
             def limpiar_texto(t):
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-            # --- PROCESAMIENTO BASE ---
+            # --- PROCESAMIENTO ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -254,27 +254,22 @@ elif pagina == "Ranking de Asesores 🥇":
             ranking_base['Prioridad'] = ranking_base['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking_base = ranking_base.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
 
-            # --- SECCIÓN DE FILTROS DINÁMICOS ---
+            # --- FILTROS ---
             st.write("### 🔍 Buscador y Filtros")
             col_f1, col_f2 = st.columns(2)
-            
             with col_f1:
-                # Permite escribir y seleccionar múltiples sucursales
                 sucursales_disp = sorted(ranking_base['Sucursal'].unique())
                 filtro_sucursal = st.multiselect("Filtrar por Sucursal:", sucursales_disp)
-            
             with col_f2:
-                # Permite buscar por nombre de asesor
                 filtro_asesor = st.text_input("Buscar Asesor (Escribe el nombre):")
 
-            # Aplicar los filtros al dataframe
             ranking = ranking_base.copy()
             if filtro_sucursal:
                 ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
             if filtro_asesor:
                 ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
 
-            # --- PODIO (Solo se muestra si no hay filtros aplicados para mantener la jerarquía) ---
+            # --- PODIO ---
             if not filtro_sucursal and not filtro_asesor:
                 st.write("## 🎖️ Cuadro de Honor")
                 podio_cols = st.columns(3)
@@ -287,12 +282,9 @@ elif pagina == "Ranking de Asesores 🥇":
 
             st.divider()
 
-            # --- TABLA DETALLADA CON ESTILO ---
-            st.write("### 📊 Ranking Detallado")
-            
-            # Recalcular Rank según el filtro actual
+            # --- TABLA PRINCIPAL ---
+            st.write("### 📊 Desglose de Ventas")
             ranking['Rank'] = [f"{i+1}°" for i in range(len(ranking))]
-            
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
 
             def color_texto(row):
@@ -308,20 +300,21 @@ elif pagina == "Ranking de Asesores 🥇":
                 hide_index=True
             )
 
-            # --- FILA DE TOTALES (Basada en la selección de filtros) ---
-            # Si filtramos, el TOTAL debe representar solo lo que estamos viendo
-            # pero excluyendo virtual según la regla de negocio
+            # --- TOTALES CENTRADOS ---
             df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
-            
             totales = pd.DataFrame({
                 'Métrica': ['TOTAL'],
-                'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
-                'PDA': [df_para_totales['PDA'].sum()], 'ADJ': [df_para_totales['ADJ'].sum()],
-                'VE': [df_para_totales['VE'].sum()], 'TOTAL': [df_para_totales['TOTAL'].sum()],
+                'VN': [df_para_totales['VN'].sum()], 
+                'VO': [df_para_totales['VO'].sum()],
+                'PDA': [df_para_totales['PDA'].sum()], 
+                'ADJ': [df_para_totales['ADJ'].sum()],
+                'VE': [df_para_totales['VE'].sum()], 
+                'TOTAL': [df_para_totales['TOTAL'].sum()],
                 'TOMA_VO': [df_para_totales['TOMA_VO'].sum()]
-            })
+            }).set_index('Métrica')
 
-            st.table(totales.set_index('Métrica'))
+            # Aplicar centrado a los números en la tabla de totales
+            st.table(totales.style.set_properties(**{'text-align': 'center'}))
 
         except Exception as e:
             st.error(f"Error: {e}")
