@@ -263,7 +263,7 @@ elif pagina == "Ranking de Asesores 🥇":
 
             u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
-                'VO': int((x[c_t_45] == (['O2','O2R'])).sum()),
+                'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
                 'ADJ': int((x[c_t_45] == 'PL').sum()),
                 'VE': int((x[c_t_45] == 'VE').sum()),
                 'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
