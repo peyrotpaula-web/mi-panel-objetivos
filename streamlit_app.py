@@ -266,30 +266,33 @@ elif pagina == "Ranking de Asesores 🥇":
 
             st.divider()
 
-            # --- TABLA CON FILTROS Y COLOR DE FUENTE ---
-            st.write("### 📊 Desglose de Ventas (Filtrable)")
+            # --- TABLA DETALLADA ---
+            st.write("### 📊 Desglose de Ventas")
             
-            ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+            # Agregamos Rank
+            ranking.insert(0, 'Rank', [f"{i+1}°" for i in range(len(ranking))])
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
 
-            # Función para colorear solo el TEXTO
+            # Función para colorear texto sin negrita
             def color_texto(row):
                 if row['Sucursal'] == "SUCURSAL VIRTUAL":
-                    return ['color: #0056b3; font-weight: bold'] * len(row) # Azul oscuro
+                    return ['color: #1a73e8; font-weight: normal'] * len(row) # Azul profesional
                 elif row['Sucursal'] == "RED SECUNDARIA":
-                    return ['color: #6f42c1; font-weight: bold'] * len(row) # Violeta oscuro
+                    return ['color: #8e44ad; font-weight: normal'] * len(row) # Violeta suave
                 return [''] * len(row)
 
+            # Mostramos la tabla principal con filtros habilitados
+            # st.dataframe activa filtros automáticamente si pasas el dataframe
             st.dataframe(
                 final_display.style.apply(color_texto, axis=1),
                 use_container_width=True,
                 hide_index=True
             )
 
-            # --- TOTALES ---
+            # --- FILA DE TOTALES ---
             df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
             totales = pd.DataFrame({
-                'Métrica': ['TOTAL OPERATIVO (Excl. Virtual)'],
+                'Métrica': ['TOTAL'],
                 'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
                 'PDA': [df_para_totales['PDA'].sum()], 'ADJ': [df_para_totales['ADJ'].sum()],
                 'VE': [df_para_totales['VE'].sum()], 'TOTAL': [df_para_totales['TOTAL'].sum()],
@@ -297,7 +300,7 @@ elif pagina == "Ranking de Asesores 🥇":
             })
 
             st.table(totales.set_index('Métrica'))
-            st.info("💡 Puedes filtrar por Sucursal o buscar un Asesor usando los íconos en los encabezados de la tabla.")
+            st.info("💡 Tip: Pasa el mouse sobre el encabezado de cualquier columna para ver las opciones de filtro y búsqueda.")
 
         except Exception as e:
             st.error(f"Error: {e}")
