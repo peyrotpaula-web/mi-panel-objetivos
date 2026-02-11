@@ -3,13 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# 1. CONFIGURACIÓN
-st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
+# 1. CONFIGURACIÓN BASE
+st.set_page_config(page_title="Gestión Comercial Grupo", layout="wide")
 
-def limpiar_texto(t):
-    return " ".join(str(t).split()).replace(".", "").strip().upper()
-
-# 2. MAESTRO DE ASESORES
+# Maestro de Asesores (Copia fiel del tuyo)
 maestro_asesores = {
     "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
     "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -53,80 +50,126 @@ maestro_asesores = {
     "PILAR ALCOBA": "SUCURSAL VIRTUAL", "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL"
 }
 
-st.sidebar.title("🚀 Menú de Gestión")
-pagina = st.sidebar.radio("Seleccione el Panel:", ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇", "Cumplimiento de Objetivos 🎯"])
+def limpiar_texto(t):
+    return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-# --- PANEL 1 Y 2 SE MANTIENEN IGUAL (Omitidos aquí por brevedad pero deben ir en tu código completo) ---
+# NAVEGACIÓN
+pagina = st.sidebar.radio("Seleccionar Panel:", ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇", "Cumplimiento de Objetivos 🎯"])
 
-if pagina == "Cumplimiento de Objetivos 🎯":
-    st.title("🎯 Cumplimiento de Objetivos (Ventas Reales)")
+# =========================================================
+# OPCIÓN 1: PANEL DE OBJETIVOS (CÓDIGO ORIGINAL RECUPERADO)
+# =========================================================
+if pagina == "Panel de Objetivos Sucursales":
+    st.title("📊 Panel de Control de Objetivos Sucursales")
+    COLORES_MARCAS = {"PAMPAWAGEN": "#001E50", "FORTECAR": "#102C54", "GRANVILLE": "#FFCE00", "CITROEN SN": "#E20613", "OPENCARS": "#00A1DF", "RED SECUNDARIA": "#4B4B4B", "OTRAS": "#999999"}
+    uploaded_file = st.file_uploader("Sube el archivo Excel de Objetivos", type=["xlsx"], key="panel_obj")
     
-    c1, c2, c3 = st.columns(3)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_c")
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_c")
-    with c3: u_meta = st.file_uploader("Cumplimiento de Objetivos.xlsx", type=["xlsx"], key="meta_c")
-
-    if u45 and u53 and u_meta:
+    if uploaded_file:
         try:
-            # 1. PROCESAR VENTAS REALES (U45 y U53)
-            def cargar(f): return pd.read_excel(f) if f.name.endswith('xlsx') else pd.read_csv(f)
-            df45, df53 = cargar(u45), cargar(u53)
-            
+            df = pd.read_excel(uploaded_file)
+            df.columns = [str(c).strip() for c in df.columns]
+            col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
+            df['Marca'] = "OTRAS"
+            marca_actual = "OTRAS"
+            for i, row in df.iterrows():
+                texto = str(row[col_obj]).upper()
+                if "OPENCARS" in texto: marca_actual = "OPENCARS"
+                elif "PAMPAWAGEN" in texto: marca_actual = "PAMPAWAGEN"
+                elif "FORTECAR" in texto: marca_actual = "FORTECAR"
+                elif "GRANVILLE" in texto: marca_actual = "GRANVILLE"
+                elif "CITROEN" in texto: marca_actual = "CITROEN SN"
+                elif "RED" in texto: marca_actual = "RED SECUNDARIA"
+                df.at[i, 'Marca'] = marca_actual
+            df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].dropna(subset=[col_n1]).copy()
+            marca_sel = st.sidebar.selectbox("Empresa:", ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist()))
+            df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
+            df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).fillna(0).round(0).astype(int)
+            df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
+            st.subheader(f"📍 Resumen: {marca_sel}")
+            t_log, t_n1, t_n2 = df_final[col_log].sum(), df_final[col_n1].sum(), df_final[col_n2].sum()
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Logrado", int(t_log)); c2.metric("Nivel 1", int(t_n1)); c3.metric("Nivel 2", int(t_n2)); c4.metric("% Global", f"{int((t_log/t_n1*100)) if t_n1>0 else 0}%")
+            fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group', color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
+            st.plotly_chart(fig_bar, use_container_width=True)
+            st.table(df_final[[col_obj, '%_txt']].set_index(col_obj))
+        except Exception as e: st.error(f"Error: {e}")
+
+# =========================================================
+# OPCIÓN 2: RANKING (RESTAURADO AL LOGRADO ANTERIORMENTE)
+# =========================================================
+elif pagina == "Ranking de Asesores 🥇":
+    st.title("🏆 Ranking de Asesores Comercial")
+    c1, c2 = st.columns(2)
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_main")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_main")
+    if u45 and u53:
+        try:
+            def leer(f): 
+                if f.name.endswith('.csv'): return pd.read_csv(f)
+                return pd.read_excel(f, engine='xlrd' if f.name.endswith('.xls') else None)
+            df45_raw, df53_raw = leer(u45), leer(u53)
+            # Procesamiento U45
+            c_v_45 = df45_raw.columns[4]; c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
+            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
+            df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
+            df45['KEY'] = df45[c_v_45].apply(limpiar_texto)
+            u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({'VN': (x[c_t_45].isin(['O', 'OP'])).sum(), 'VO': (x[c_t_45].isin(['O2','O2R'])).sum(), 'ADJ': (x[c_t_45]=='PL').sum(), 'VE': (x[c_t_45]=='VE').sum()})).reset_index()
+            # Procesamiento U53
+            c_v_53 = df53_raw.columns[0]; df53 = df53_raw.copy(); df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
+            u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
+            # Union
+            ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
-            
-            # Obtener sucursal de cada venta
-            suc_45 = df45.iloc[:, 4].apply(limpiar_texto).map(maestro_limpio)
-            suc_53 = df53.iloc[:, 0].apply(limpiar_texto).map(maestro_limpio)
-            
-            reales = pd.concat([suc_45, suc_53]).value_counts().reset_index()
-            reales.columns = ['Nombre_Sucursal', 'Total_Ventas']
-            reales['KEY'] = reales['Nombre_Sucursal'].apply(limpiar_texto)
+            ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
+            ranking = ranking.dropna(subset=['Sucursal']).copy()
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
+            ranking = ranking.sort_values('TOTAL', ascending=False).reset_index(drop=True)
+            # Podio
+            cols = st.columns(3)
+            for i in range(min(3, len(ranking))):
+                with cols[i]: st.metric(f"Pos {i+1} - {ranking.iloc[i]['KEY']}", f"{int(ranking.iloc[i]['TOTAL'])} u.")
+            st.divider()
+            st.dataframe(ranking[['KEY', 'VN', 'VO', 'PDA', 'TOTAL', 'Sucursal']], use_container_width=True)
+        except Exception as e: st.error(f"Error procesando Ranking: {e}")
 
-            # 2. PROCESAR EXCEL DE METAS
-            df_m = pd.read_excel(u_meta)
-            # Aseguramos que tenga al menos 6 columnas
-            while len(df_m.columns) < 6:
-                df_m[f"Col_{len(df_m.columns)}"] = 0
+# =========================================================
+# OPCIÓN 3: CUMPLIMIENTO (NUEVO - SINCRONIZADO)
+# =========================================================
+elif pagina == "Cumplimiento de Objetivos 🎯":
+    st.title("🎯 Cumplimiento de Objetivos (Sincronizado)")
+    st.info("Sube los archivos para ver la tabla de objetivos con los datos de 'Logrado' actualizados automáticamente.")
+    c1, c2, c3 = st.columns(3)
+    with c1: f45 = st.file_uploader("U45", type=["xlsx", "xls", "csv"], key="u45_cump")
+    with c2: f53 = st.file_uploader("U53", type=["xlsx", "xls", "csv"], key="u53_cump")
+    with c3: f_meta = st.file_uploader("Archivo Objetivos", type=["xlsx"], key="meta_cump")
+    
+    if f45 and f53 and f_meta:
+        try:
+            # 1. Obtener Ventas de los archivos reales
+            d45 = pd.read_excel(f45) if f45.name.endswith('xlsx') else pd.read_csv(f45)
+            d53 = pd.read_excel(f53) if f53.name.endswith('xlsx') else pd.read_csv(f53)
+            maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
+            d45['Sucursal'] = d45.iloc[:, 4].apply(limpiar_texto).map(maestro_limpio)
+            d53['Sucursal'] = d53.iloc[:, 0].apply(limpiar_texto).map(maestro_limpio)
+            ventas_por_sucursal = pd.concat([d45['Sucursal'], d53['Sucursal']]).value_counts().to_dict()
             
-            df_m['KEY'] = df_m.iloc[:, 0].apply(limpiar_texto) # Columna A (Sucursal)
+            # 2. Leer archivo de cumplimiento
+            df_m = pd.read_excel(f_meta)
+            df_m.columns = [str(c).strip() for c in df_m.columns]
+            col_suc = df_m.columns[0]; col_log = df_m.columns[3]
             
-            # 3. UNIR Y CALCULAR (SOLO FILAS DE SUCURSALES)
-            # Primero ponemos a 0 la columna "Logrado" (Columna D / Indice 3)
-            df_m.iloc[:, 3] = 0 
-            
+            # 3. Actualizar columna Logrado
             for idx, row in df_m.iterrows():
-                key = row['KEY']
-                if key in reales['KEY'].values:
-                    venta = reales.loc[reales['KEY'] == key, 'Total_Ventas'].values[0]
-                    df_m.iloc[idx, 3] = venta
-
-            # 4. CALCULAR FILAS DE "TOTAL"
-            # Si la columna A contiene "TOTAL", sumamos lo que esté arriba hasta el anterior TOTAL
-            total_indices = df_m[df_m.iloc[:, 0].str.contains("TOTAL", na=False, case=False)].index
-            inicio = 0
-            for fin in total_indices:
-                suma_logrado = df_m.iloc[inicio:fin, 3].sum()
-                df_m.iloc[fin, 3] = suma_logrado
-                inicio = fin + 1
-
-            # 5. RECALCULAR PORCENTAJES (Col E y F / Indice 4 y 5)
-            for i in range(len(df_m)):
-                logrado = df_m.iloc[i, 3]
-                n1 = pd.to_numeric(df_m.iloc[i, 1], errors='coerce') or 1
-                n2 = pd.to_numeric(df_m.iloc[i, 2], errors='coerce') or 1
-                df_m.iloc[i, 4] = round((logrado / n1 * 100), 1)
-                df_m.iloc[i, 5] = round((logrado / n2 * 100), 1)
-
-            # 6. MOSTRAR RESULTADO
-            st.write("### ✅ Tabla de Cumplimiento Actualizada")
-            # Quitar la columna KEY antes de mostrar
-            display_df = df_m.drop(columns=['KEY'])
+                suc_txt = str(row[col_suc]).strip().upper()
+                if "TOTAL" in suc_txt:
+                    # Si es una fila de TOTAL, dejamos que el Excel sume o lo calculamos luego
+                    continue
+                # Buscamos si la sucursal del excel está en nuestras ventas reales
+                for suc_real, cant in ventas_por_sucursal.items():
+                    if str(suc_real).upper() in suc_txt:
+                        df_m.at[idx, col_log] = cant
             
-            # Formatear para que parezca el Excel original
-            st.dataframe(display_df.style.format({
-                display_df.columns[4]: "{:.1f}%",
-                display_df.columns[5]: "{:.1f}%"
-            }), use_container_width=True, hide_index=True)
-
-        except Exception as e:
-            st.error(f"Se produjo un error: {e}")
+            # 4. Mostrar exactamente como el archivo
+            st.write("### 📊 Tabla de Objetivos Actualizada")
+            st.dataframe(df_m.fillna(0), use_container_width=True, hide_index=True)
+        except Exception as e: st.error(f"Error en cumplimiento: {e}")
