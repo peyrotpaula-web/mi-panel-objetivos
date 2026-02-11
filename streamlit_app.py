@@ -220,7 +220,7 @@ elif pagina == "Ranking de Asesores 🥇":
             def limpiar_texto(t):
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-            # --- PROCESAMIENTO BASE ---
+            # --- PROCESAMIENTO ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -254,74 +254,78 @@ elif pagina == "Ranking de Asesores 🥇":
             ranking_base['Prioridad'] = ranking_base['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking_base = ranking_base.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
 
-            # --- SECCIÓN DE FILTROS DINÁMICOS ---
+            # --- FILTROS ---
             st.write("### 🔍 Buscador y Filtros")
             col_f1, col_f2 = st.columns(2)
-            
             with col_f1:
-                # Permite escribir y seleccionar múltiples sucursales
                 sucursales_disp = sorted(ranking_base['Sucursal'].unique())
                 filtro_sucursal = st.multiselect("Filtrar por Sucursal:", sucursales_disp)
-            
             with col_f2:
-                # Permite buscar por nombre de asesor
                 filtro_asesor = st.text_input("Buscar Asesor (Escribe el nombre):")
 
-            # Aplicar los filtros al dataframe
             ranking = ranking_base.copy()
             if filtro_sucursal:
                 ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
             if filtro_asesor:
                 ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
 
-            # --- PODIO (Solo se muestra si no hay filtros aplicados para mantener la jerarquía) ---
+            # --- PODIO VISUAL (SUPERIOR) ---
             if not filtro_sucursal and not filtro_asesor:
                 st.write("## 🎖️ Cuadro de Honor")
                 podio_cols = st.columns(3)
-                medallas, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
+                medallas_p, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
                 for i in range(3):
                     if i < len(ranking):
                         asesor = ranking.iloc[i]
                         with podio_cols[i]:
-                            st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas_p[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
 
             st.divider()
 
-            # --- TABLA DETALLADA CON ESTILO ---
-            st.write("### 📊 Ranking Detallado")
+            # --- TABLA PRINCIPAL CON MEDALLAS ---
+            st.write("### 📊 Desglose de Ventas")
             
-            # Recalcular Rank según el filtro actual
-            ranking['Rank'] = [f"{i+1}°" for i in range(len(ranking))]
-            
+            # Lógica de medallas en la columna Rank
+            ranks = []
+            for i in range(len(ranking)):
+                if i == 0: ranks.append("🥇 1°")
+                elif i == 1: ranks.append("🥈 2°")
+                elif i == 2: ranks.append("🥉 3°")
+                else: ranks.append(f"{i+1}°")
+            ranking['Rank'] = ranks
+
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
 
-            def color_texto(row):
+            def color_y_centrado(row):
+                # Centrado para todas las columnas
+                styles = ['text-align: center'] * len(row)
+                # Color de fuente para canales especiales (grosor normal)
                 if row['Sucursal'] == "SUCURSAL VIRTUAL":
-                    return ['color: #1a73e8; font-weight: normal'] * len(row)
+                    styles = [s + '; color: #1a73e8; font-weight: normal' for s in styles]
                 elif row['Sucursal'] == "RED SECUNDARIA":
-                    return ['color: #8e44ad; font-weight: normal'] * len(row)
-                return [''] * len(row)
+                    styles = [s + '; color: #8e44ad; font-weight: normal' for s in styles]
+                return styles
 
             st.dataframe(
-                final_display.style.apply(color_texto, axis=1),
+                final_display.style.apply(color_y_centrado, axis=1),
                 use_container_width=True,
                 hide_index=True
             )
 
-            # --- FILA DE TOTALES (Basada en la selección de filtros) ---
-            # Si filtramos, el TOTAL debe representar solo lo que estamos viendo
-            # pero excluyendo virtual según la regla de negocio
+            # --- TOTALES CENTRADOS ---
             df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
-            
             totales = pd.DataFrame({
                 'Métrica': ['TOTAL'],
-                'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
-                'PDA': [df_para_totales['PDA'].sum()], 'ADJ': [df_para_totales['ADJ'].sum()],
-                'VE': [df_para_totales['VE'].sum()], 'TOTAL': [df_para_totales['TOTAL'].sum()],
+                'VN': [df_para_totales['VN'].sum()], 
+                'VO': [df_para_totales['VO'].sum()],
+                'PDA': [df_para_totales['PDA'].sum()], 
+                'ADJ': [df_para_totales['ADJ'].sum()],
+                'VE': [df_para_totales['VE'].sum()], 
+                'TOTAL': [df_para_totales['TOTAL'].sum()],
                 'TOMA_VO': [df_para_totales['TOMA_VO'].sum()]
-            })
+            }).set_index('Métrica')
 
-            st.table(totales.set_index('Métrica'))
+            st.table(totales.style.set_properties(**{'text-align': 'center'}))
 
         except Exception as e:
             st.error(f"Error: {e}")
