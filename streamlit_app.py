@@ -154,12 +154,12 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (ACTUALIZADO Y PULIDO)
+# OPCIÓN 2: RANKING DE ASESORES (CON PRIORIDAD JERÁRQUICA)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # Mantenemos tu maestro de asesores intacto
+    # --- MAESTRO DE ASESORES ---
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -200,101 +200,91 @@ elif pagina == "Ranking de Asesores 🥇":
     }
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Archivo U45 (Ventas)", type=["xlsx", "xls", "csv"], key="u45_key")
-    with c2: u53 = st.file_uploader("Archivo U53 (Planes)", type=["xlsx", "xls", "csv"], key="u53_key")
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_k")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_k")
 
     if u45 and u53:
         try:
-            # Función de procesamiento (Encapsulada para mayor limpieza)
-            @st.cache_data
-            def procesar_datos(f45, f53, maestro):
-                def leer_archivo(file):
-                    if file.name.endswith('.csv'): return pd.read_csv(file)
-                    return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
+            def leer_archivo(file):
+                if file.name.endswith('.csv'): return pd.read_csv(file)
+                return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
 
-                df45_raw = leer_archivo(f45)
-                df53_raw = leer_archivo(f53)
+            df45_raw = leer_archivo(u45)
+            df53_raw = leer_archivo(u53)
 
-                def limpiar_texto(t):
-                    return " ".join(str(t).split()).replace(".", "").strip().upper()
+            def limpiar_texto(t):
+                return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-                # Procesamiento U45
-                c_v_45 = df45_raw.columns[4]
-                c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
-                c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
-                c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
+            # --- PROCESAMIENTO ---
+            c_v_45 = df45_raw.columns[4]
+            c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
+            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
+            c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
-                df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
-                df45['KEY'] = df45[c_v_45].apply(limpiar_texto)
+            df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
+            df45['KEY'] = df45[c_v_45].apply(limpiar_texto)
 
-                u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
-                    'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
-                    'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
-                    'ADJ': int((x[c_t_45] == 'PL').sum()),
-                    'VE': int((x[c_t_45] == 'VE').sum()),
-                    'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
-                })).reset_index()
+            u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
+                'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
+                'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
+                'ADJ': int((x[c_t_45] == 'PL').sum()),
+                'VE': int((x[c_t_45] == 'VE').sum()),
+                'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
+            })).reset_index()
 
-                # Procesamiento U53
-                c_v_53 = df53_raw.columns[0]
-                df53 = df53_raw.copy()
-                df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
-                u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
+            c_v_53 = df53_raw.columns[0]
+            df53 = df53_raw.copy()
+            df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
+            u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-                # Unión y Limpieza
-                res = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
-                maestro_limpio = {limpiar_texto(k): v for k, v in maestro.items()}
-                res['Sucursal'] = res['KEY'].map(maestro_limpio)
-                res = res.dropna(subset=['Sucursal']).copy()
+            ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
+            maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
+            ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
+            ranking = ranking.dropna(subset=['Sucursal']).copy()
 
-                for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']:
-                    res[c] = res[c].astype(int)
+            for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']:
+                ranking[c] = ranking[c].astype(int)
 
-                res['TOTAL'] = res['VN'] + res['VO'] + res['ADJ'] + res['VE'] + res['PDA']
-                return res.sort_values(by=['TOTAL', 'TOMA_VO'], ascending=[False, False]).reset_index(drop=True)
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
 
-            ranking_full = procesar_datos(u45, u53, maestro_asesores)
+            # --- LÓGICA DE PRIORIDAD (NUEVO) ---
+            # Asignamos 1 a RED SECUNDARIA y 0 al resto para que al ordenar de menor a mayor queden abajo
+            ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
 
-            # --- FILTRO POR SUCURSAL ---
-            sucursales_disponibles = ["TODAS"] + sorted(ranking_full['Sucursal'].unique().tolist())
-            sucursal_sel = st.selectbox("📍 Filtrar Ranking por Sucursal:", sucursales_disponibles)
+            # Ordenamos: primero por Prioridad (asc), luego por TOTAL (desc) y TOMA_VO (desc)
+            ranking = ranking.sort_values(
+                by=['Prioridad', 'TOTAL', 'TOMA_VO'], 
+                ascending=[True, False, False]
+            ).reset_index(drop=True)
 
-            ranking = ranking_full if sucursal_sel == "TODAS" else ranking_full[ranking_full['Sucursal'] == sucursal_sel].copy()
-            ranking = ranking.reset_index(drop=True)
-
-            # --- PODIO VISUAL (NUEVO) ---
-            st.write("### 🎖️ Cuadro de Honor")
-            top_cols = st.columns(3)
-            for i, medalla in enumerate(["🥇", "🥈", "🥉"]):
-                if i < len(ranking):
-                    with top_cols[i]:
-                        st.markdown(f"""
-                        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid {'#FFD700' if i==0 else '#C0C0C0' if i==1 else '#CD7F32'}">
-                            <h2 style="margin:0;">{medalla}</h2>
-                            <p style="margin:0; font-weight: bold; font-size: 1.1em;">{ranking.iloc[i]['KEY']}</p>
-                            <h3 style="margin:0; color: #1f77b4;">{ranking.iloc[i]['TOTAL']} <small>unidades</small></h3>
-                        </div>
-                        """, unsafe_allow_html=True)
+            # --- VISUALIZACIÓN ---
+            st.write("### 🏆 Ranking Comercial Oficial")
             
-            st.divider()
-
-            # --- TABLA FINAL ---
-            # Agregamos iconos de posición
-            ranking.insert(0, 'Posición', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+            # Iconos de podio solo para los que NO son Red Secundaria (opcional, pero queda mejor)
+            icons = []
+            for i, row in ranking.iterrows():
+                if row['Sucursal'] == "RED SECUNDARIA":
+                    icons.append(f"{i+1}°")
+                else:
+                    if i == 0: icons.append("🥇 1°")
+                    elif i == 1: icons.append("🥈 2°")
+                    elif i == 2: icons.append("🥉 3°")
+                    else: icons.append(f"{i+1}°")
             
-            # Cálculo de totales para la fila de abajo
+            ranking.insert(0, 'Rank_Icon', icons)
+            
+            # Totales
             totales = pd.DataFrame({
-                'Posición': [''], 'KEY': ['TOTAL GENERAL'],
+                'Rank_Icon': [''], 'KEY': ['TOTAL GENERAL'],
                 'VN': [ranking['VN'].sum()], 'VO': [ranking['VO'].sum()],
                 'PDA': [ranking['PDA'].sum()], 'ADJ': [ranking['ADJ'].sum()],
                 'VE': [ranking['VE'].sum()], 'TOTAL': [ranking['TOTAL'].sum()],
                 'TOMA_VO': [ranking['TOMA_VO'].sum()], 'Sucursal': ['']
             })
 
-            ranking_display = ranking[['Posición', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
+            ranking_display = ranking[['Rank_Icon', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'Rank_Icon': 'Ranking', 'KEY': 'Asesor'})
             
-            st.write(f"### 📊 Tabla de Rendimiento: {sucursal_sel}")
             st.dataframe(pd.concat([ranking_display, totales], ignore_index=True), use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error en el procesamiento: {e}")
+            st.error(f"Error: {e}")
