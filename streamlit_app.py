@@ -154,12 +154,12 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING + CUMPLIMIENTO DE OBJETIVOS (UNIFICADO)
+# OPCIÓN 2: RANKING CON PODIO VISUAL Y JERARQUÍA
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
-    st.title("🏆 Ranking y Cumplimiento de Objetivos")
+    st.title("🏆 Ranking de Asesores Comercial")
     
-    # Reutilizamos el maestro de asesores
+    # 1. MAESTRO ACTUALIZADO
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -197,36 +197,39 @@ elif pagina == "Ranking de Asesores 🥇":
         "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
         "1119 ROMAN GAVINO": "FORTECAR NUEVE DE JULIO", "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
         "1118 BRENDA AGUIRRE": "FORTECAR OLAVARRIA",
+        # ASESORES VIRTUALES
         "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "GERMAN CALVO": "SUCURSAL VIRTUAL",
         "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL", "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
         "CAMILA GARCIA": "SUCURSAL VIRTUAL", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
         "PILAR ALCOBA": "SUCURSAL VIRTUAL", "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL"
     }
 
-    c1, c2, c3 = st.columns(3)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_u")
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_u")
-    with c3: u_obj = st.file_uploader("Archivo Objetivos", type=["xlsx", "csv"], key="u_obj_u")
+    c1, c2 = st.columns(2)
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_final")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_final")
 
-    if u45 and u53 and u_obj:
+    if u45 and u53:
         try:
-            def leer_f(f):
-                if f.name.endswith('.csv'): return pd.read_csv(f)
-                return pd.read_excel(f)
+            def leer_archivo(file):
+                if file.name.endswith('.csv'): return pd.read_csv(file)
+                return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
 
-            df45_raw, df53_raw, df_obj = leer_f(u45), leer_f(u53), leer_f(u_obj)
-            def limpiar_t(t): return " ".join(str(t).split()).replace(".", "").strip().upper()
+            df45_raw = leer_archivo(u45)
+            df53_raw = leer_archivo(u53)
 
-            # --- 1. PROCESAMIENTO PARA EL RANKING ---
+            def limpiar_texto(t):
+                return " ".join(str(t).split()).replace(".", "").strip().upper()
+
+            # --- PROCESAMIENTO ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
-            df45_f = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
-            df45_f['KEY'] = df45_f[c_v_45].apply(limpiar_t)
+            df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
+            df45['KEY'] = df45[c_v_45].apply(limpiar_texto)
 
-            u45_sum = df45_f.groupby('KEY').apply(lambda x: pd.Series({
+            u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
                 'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
                 'ADJ': int((x[c_t_45] == 'PL').sum()),
@@ -234,11 +237,13 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
             })).reset_index()
 
-            df53_raw['KEY'] = df53_raw.iloc[:, 0].apply(limpiar_t)
-            u53_sum = df53_raw.groupby('KEY').size().reset_index(name='PDA')
+            c_v_53 = df53_raw.columns[0]
+            df53 = df53_raw.copy()
+            df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
+            u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
             ranking_base = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
-            maestro_limpio = {limpiar_t(k): v for k, v in maestro_asesores.items()}
+            maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             ranking_base['Sucursal'] = ranking_base['KEY'].map(maestro_limpio)
             ranking_base = ranking_base.dropna(subset=['Sucursal']).copy()
 
@@ -249,50 +254,79 @@ elif pagina == "Ranking de Asesores 🥇":
             ranking_base['Prioridad'] = ranking_base['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking_base = ranking_base.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
 
-            # --- MOSTRAR RANKING (Con Filtros) ---
-            st.write("### 🔍 Filtros del Ranking")
-            f_suc = st.multiselect("Sucursal:", sorted(ranking_base['Sucursal'].unique()), key="fsuc")
-            f_ase = st.text_input("Buscar Asesor:", key="fase")
+            # --- FILTROS ---
+            st.write("### 🔍 Buscador y Filtros")
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                sucursales_disp = sorted(ranking_base['Sucursal'].unique())
+                filtro_sucursal = st.multiselect("Filtrar por Sucursal:", sucursales_disp)
+            with col_f2:
+                filtro_asesor = st.text_input("Buscar Asesor (Escribe el nombre):")
 
             ranking = ranking_base.copy()
-            if f_suc: ranking = ranking[ranking['Sucursal'].isin(f_suc)]
-            if f_ase: ranking = ranking[ranking['KEY'].str.contains(f_ase.upper())]
+            if filtro_sucursal:
+                ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
+            if filtro_asesor:
+                ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
 
-            ranks = ["🥇 1°" if i==0 else "🥈 2°" if i==1 else "🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))]
-            ranking['Rank'] = ranks
-            
-            df_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
-            
-            st.dataframe(df_display.style.set_properties(**{'text-align': 'center'}), use_container_width=True, hide_index=True)
+            # --- PODIO VISUAL (SUPERIOR) ---
+            if not filtro_sucursal and not filtro_asesor:
+                st.write("## 🎖️ Cuadro de Honor")
+                podio_cols = st.columns(3)
+                medallas_p, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
+                for i in range(3):
+                    if i < len(ranking):
+                        asesor = ranking.iloc[i]
+                        with podio_cols[i]:
+                            st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas_p[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
 
-            # --- 2. CUADRO DE CUMPLIMIENTO (DEBAJO) ---
             st.divider()
-            st.write("### 🎯 Cumplimiento de Objetivos")
-            
-            # Agrupar ventas reales por sucursal
-            ventas_por_suc = ranking_base.groupby('Sucursal')['TOTAL'].sum().reset_index()
-            ventas_por_suc.columns = ['Sucursal', 'Logrado']
 
-            # Procesar el archivo de objetivos cargado (usando la columna Objetivo)
-            # Nota: Si tu archivo tiene "Nivel 1", cambiaremos el nombre aquí
-            df_obj.rename(columns={'Nivel 1': 'Objetivo'}, inplace=True, errors='ignore')
+            # --- TABLA PRINCIPAL CON MEDALLAS ---
+            st.write("### 📊 Desglose de Ventas")
             
-            df_cumplimiento = pd.merge(df_obj[['Sucursal', 'Objetivo']], ventas_por_suc, on='Sucursal', how='left').fillna(0)
-            df_cumplimiento['Faltan'] = (df_cumplimiento['Objetivo'] - df_cumplimiento['Logrado']).clip(lower=0)
-            df_cumplimiento['%'] = (df_cumplimiento['Logrado'] / df_cumplimiento['Objetivo'].replace(0, 1) * 100).round(1)
+            # Lógica de medallas en la columna Rank
+            ranks = []
+            for i in range(len(ranking)):
+                if i == 0: ranks.append("🥇 1°")
+                elif i == 1: ranks.append("🥈 2°")
+                elif i == 2: ranks.append("🥉 3°")
+                else: ranks.append(f"{i+1}°")
+            ranking['Rank'] = ranks
 
-            def estilo_semaforo(row):
-                val = row['%']
-                color = '#28a745' if val >= 100 else '#fd7e14' if val >= 80 else '#dc3545'
+            final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
+
+            def color_y_centrado(row):
+                # Centrado para todas las columnas
                 styles = ['text-align: center'] * len(row)
-                styles[4] = f'text-align: center; color: {color}; font-weight: bold'
+                # Color de fuente para canales especiales (grosor normal)
+                if row['Sucursal'] == "SUCURSAL VIRTUAL":
+                    styles = [s + '; color: #1a73e8; font-weight: normal' for s in styles]
+                elif row['Sucursal'] == "RED SECUNDARIA":
+                    styles = [s + '; color: #8e44ad; font-weight: normal' for s in styles]
                 return styles
 
             st.dataframe(
-                df_cumplimiento.style.apply(estilo_semaforo, axis=1),
+                final_display.style.apply(color_y_centrado, axis=1),
                 use_container_width=True,
                 hide_index=True
             )
 
+            # --- TOTALES CENTRADOS ---
+            df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
+            totales = pd.DataFrame({
+                'Métrica': ['TOTAL'],
+                'VN': [df_para_totales['VN'].sum()], 
+                'VO': [df_para_totales['VO'].sum()],
+                'PDA': [df_para_totales['PDA'].sum()], 
+                'ADJ': [df_para_totales['ADJ'].sum()],
+                'VE': [df_para_totales['VE'].sum()], 
+                'TOTAL': [df_para_totales['TOTAL'].sum()],
+                'TOMA_VO': [df_para_totales['TOMA_VO'].sum()]
+            }).set_index('Métrica')
+
+            st.table(totales.style.set_properties(**{'text-align': 'center'}))
+
         except Exception as e:
             st.error(f"Error: {e}")
+
