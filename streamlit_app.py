@@ -160,7 +160,7 @@ if pagina == "Panel de Objetivos Sucursales":
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # Mantenemos tu maestro de asesores original
+    # 1. MAESTRO ACTUALIZADO CON SUCURSAL VIRTUAL
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -198,6 +198,11 @@ elif pagina == "Ranking de Asesores 🥇":
         "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
         "1119 ROMAN GAVINO": "FORTECAR NUEVE DE JULIO", "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
         "1118 BRENDA AGUIRRE": "FORTECAR OLAVARRIA",
+        # NUEVOS ASESORES VIRTUALES
+        "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "GERMAN CALVO": "SUCURSAL VIRTUAL",
+        "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL", "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
+        "CAMILA GARCIA": "SUCURSAL VIRTUAL", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
+        "PILAR ALCOBA": "SUCURSAL VIRTUAL", "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL"
     }
 
     c1, c2 = st.columns(2)
@@ -250,7 +255,7 @@ elif pagina == "Ranking de Asesores 🥇":
 
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
 
-            # Prioridad: RED SECUNDARIA va al final (prioridad 1), el resto al principio (prioridad 0)
+            # Prioridad: RED SECUNDARIA va al final
             ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking = ranking.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
 
@@ -258,7 +263,7 @@ elif pagina == "Ranking de Asesores 🥇":
             st.write("## 🎖️ Cuadro de Honor")
             podio_cols = st.columns(3)
             medallas = ["🥇", "🥈", "🥉"]
-            colores = ["#FFD700", "#C0C0C0", "#CD7F32"] # Oro, Plata, Bronce
+            colores = ["#FFD700", "#C0C0C0", "#CD7F32"]
 
             for i in range(3):
                 if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
@@ -275,24 +280,34 @@ elif pagina == "Ranking de Asesores 🥇":
 
             st.divider()
 
-            # --- TABLA DETALLADA ---
+            # --- TABLA DETALLADA CON LÓGICA DE EXCLUSIÓN PARA TOTALES ---
             st.write("### 📊 Desglose de Ventas")
             
-            # Generar iconos para la tabla
+            # Generar el DataFrame para mostrar
             ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
             
-            # Totales para el cierre de tabla
+            # FILTRO CRÍTICO: Solo sumamos lo que NO es SUCURSAL VIRTUAL ni RED SECUNDARIA (opcional)
+            # Aquí sumamos todo excepto Virtual según tu pedido
+            df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
+
             totales = pd.DataFrame({
-                'Rank': [''], 'KEY': ['TOTAL GENERAL'],
-                'VN': [ranking['VN'].sum()], 'VO': [ranking['VO'].sum()],
-                'PDA': [ranking['PDA'].sum()], 'ADJ': [ranking['ADJ'].sum()],
-                'VE': [ranking['VE'].sum()], 'TOTAL': [ranking['TOTAL'].sum()],
-                'TOMA_VO': [ranking['TOMA_VO'].sum()], 'Sucursal': ['']
+                'Rank': [''], 'KEY': ['TOTAL OPERATIVO (Excl. Virtual)'],
+                'VN': [df_para_totales['VN'].sum()], 
+                'VO': [df_para_totales['VO'].sum()],
+                'PDA': [df_para_totales['PDA'].sum()], 
+                'ADJ': [df_para_totales['ADJ'].sum()],
+                'VE': [df_para_totales['VE'].sum()], 
+                'TOTAL': [df_para_totales['TOTAL'].sum()],
+                'TOMA_VO': [df_para_totales['TOMA_VO'].sum()], 
+                'Sucursal': ['']
             })
 
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
             
+            # Unimos la tabla de asesores con la fila de totales calculada
             st.dataframe(pd.concat([final_display, totales], ignore_index=True), use_container_width=True, hide_index=True)
+            
+            st.info("💡 Nota: El 'TOTAL OPERATIVO' en la parte inferior excluye las unidades de la Sucursal Virtual para no duplicar objetivos de facturación.")
 
         except Exception as e:
             st.error(f"Error en el procesamiento: {e}")
