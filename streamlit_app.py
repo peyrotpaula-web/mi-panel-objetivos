@@ -282,20 +282,25 @@ elif pagina == "Ranking de Asesores 🥇":
 
             st.divider()
 
-            # --- TABLA PRINCIPAL ---
+            # --- TABLA PRINCIPAL CENTRADA ---
             st.write("### 📊 Desglose de Ventas")
             ranking['Rank'] = [f"{i+1}°" for i in range(len(ranking))]
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
 
-            def color_texto(row):
+            def color_texto_y_centrado(row):
+                # Estilo base: centrado para todas las columnas
+                styles = ['text-align: center'] * len(row)
+                
+                # Sobrescribir color si es Virtual o Red Secundaria
                 if row['Sucursal'] == "SUCURSAL VIRTUAL":
-                    return ['color: #1a73e8; font-weight: normal'] * len(row)
+                    styles = [s + '; color: #1a73e8; font-weight: normal' for s in styles]
                 elif row['Sucursal'] == "RED SECUNDARIA":
-                    return ['color: #8e44ad; font-weight: normal'] * len(row)
-                return [''] * len(row)
+                    styles = [s + '; color: #8e44ad; font-weight: normal' for s in styles]
+                
+                return styles
 
             st.dataframe(
-                final_display.style.apply(color_texto, axis=1),
+                final_display.style.apply(color_texto_y_centrado, axis=1),
                 use_container_width=True,
                 hide_index=True
             )
@@ -313,7 +318,7 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': [df_para_totales['TOMA_VO'].sum()]
             }).set_index('Métrica')
 
-            # Aplicar centrado a los números en la tabla de totales
+            # Centrado explícito para la tabla de totales
             st.table(totales.style.set_properties(**{'text-align': 'center'}))
 
         except Exception as e:
