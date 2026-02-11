@@ -154,12 +154,12 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (CON PRIORIDAD JERÁRQUICA)
+# OPCIÓN 2: RANKING CON PODIO VISUAL Y JERARQUÍA
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # --- MAESTRO DE ASESORES ---
+    # Mantenemos tu maestro de asesores original
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -200,8 +200,8 @@ elif pagina == "Ranking de Asesores 🥇":
     }
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_k")
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_k")
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_final")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_final")
 
     if u45 and u53:
         try:
@@ -215,7 +215,7 @@ elif pagina == "Ranking de Asesores 🥇":
             def limpiar_texto(t):
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-            # --- PROCESAMIENTO ---
+            # --- PROCESAMIENTO U45 ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -232,11 +232,13 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
             })).reset_index()
 
+            # --- PROCESAMIENTO U53 ---
             c_v_53 = df53_raw.columns[0]
             df53 = df53_raw.copy()
             df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
+            # --- MERGE Y LÓGICA DE ORDENAMIENTO ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
@@ -247,44 +249,49 @@ elif pagina == "Ranking de Asesores 🥇":
 
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
 
-            # --- LÓGICA DE PRIORIDAD (NUEVO) ---
-            # Asignamos 1 a RED SECUNDARIA y 0 al resto para que al ordenar de menor a mayor queden abajo
+            # Prioridad: RED SECUNDARIA va al final (prioridad 1), el resto al principio (prioridad 0)
             ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
+            ranking = ranking.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
 
-            # Ordenamos: primero por Prioridad (asc), luego por TOTAL (desc) y TOMA_VO (desc)
-            ranking = ranking.sort_values(
-                by=['Prioridad', 'TOTAL', 'TOMA_VO'], 
-                ascending=[True, False, False]
-            ).reset_index(drop=True)
+            # --- VISUALIZACIÓN: PODIO ---
+            st.write("## 🎖️ Cuadro de Honor")
+            podio_cols = st.columns(3)
+            medallas = ["🥇", "🥈", "🥉"]
+            colores = ["#FFD700", "#C0C0C0", "#CD7F32"] # Oro, Plata, Bronce
 
-            # --- VISUALIZACIÓN ---
-            st.write("### 🏆 Ranking Comercial Oficial")
+            for i in range(3):
+                if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
+                    asesor = ranking.iloc[i]
+                    with podio_cols[i]:
+                        st.markdown(f"""
+                        <div style="text-align: center; border: 2px solid {colores[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;">
+                            <h1 style="margin: 0;">{medallas[i]}</h1>
+                            <p style="font-weight: bold; margin: 5px 0;">{asesor['KEY']}</p>
+                            <h2 style="color: #1f77b4; margin: 0;">{asesor['TOTAL']} <small>u.</small></h2>
+                            <span style="font-size: 0.8em; color: gray;">{asesor['Sucursal']}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+            st.divider()
+
+            # --- TABLA DETALLADA ---
+            st.write("### 📊 Desglose de Ventas")
             
-            # Iconos de podio solo para los que NO son Red Secundaria (opcional, pero queda mejor)
-            icons = []
-            for i, row in ranking.iterrows():
-                if row['Sucursal'] == "RED SECUNDARIA":
-                    icons.append(f"{i+1}°")
-                else:
-                    if i == 0: icons.append("🥇 1°")
-                    elif i == 1: icons.append("🥈 2°")
-                    elif i == 2: icons.append("🥉 3°")
-                    else: icons.append(f"{i+1}°")
+            # Generar iconos para la tabla
+            ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
             
-            ranking.insert(0, 'Rank_Icon', icons)
-            
-            # Totales
+            # Totales para el cierre de tabla
             totales = pd.DataFrame({
-                'Rank_Icon': [''], 'KEY': ['TOTAL GENERAL'],
+                'Rank': [''], 'KEY': ['TOTAL GENERAL'],
                 'VN': [ranking['VN'].sum()], 'VO': [ranking['VO'].sum()],
                 'PDA': [ranking['PDA'].sum()], 'ADJ': [ranking['ADJ'].sum()],
                 'VE': [ranking['VE'].sum()], 'TOTAL': [ranking['TOTAL'].sum()],
                 'TOMA_VO': [ranking['TOMA_VO'].sum()], 'Sucursal': ['']
             })
 
-            ranking_display = ranking[['Rank_Icon', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'Rank_Icon': 'Ranking', 'KEY': 'Asesor'})
+            final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
             
-            st.dataframe(pd.concat([ranking_display, totales], ignore_index=True), use_container_width=True, hide_index=True)
+            st.dataframe(pd.concat([final_display, totales], ignore_index=True), use_container_width=True, hide_index=True)
 
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error en el procesamiento: {e}")
