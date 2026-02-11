@@ -180,7 +180,7 @@ elif pagina == "Ranking de Asesores 🥇":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (TOTAL GENERAL CON RED SECUNDARIA)
+# OPCIÓN 3: CUMPLIMIENTO (TOTAL GENERAL CORREGIDO)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -195,9 +195,9 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             df_m = pd.read_excel(f_meta)
             df_m.columns = [str(c).strip() for c in df_m.columns]
             cols = df_m.columns
-            df_m[cols[3]] = 0 # Inicializamos columna 'Logrado'
+            df_m[cols[3]] = 0 # Logrado
             
-            # 1. Sincronización de ventas (Individuales)
+            # 1. Sincronización de ventas desde memoria (Sucursales individuales)
             for idx, row in df_m.iterrows():
                 suc_ex = str(row[cols[0]]).upper()
                 if "TOTAL" in suc_ex: continue
@@ -205,30 +205,35 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
                     if s_mem.upper() in suc_ex: 
                         df_m.at[idx, cols[3]] = val
 
-            # 2. Definición de Categorías para el Total General
-            categorias_principales = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR", "RED SECUNDARIA"]
-            
-            # 3. Cálculo de Subtotales por Marca
+            # 2. Cálculo de Subtotales por Marca (Open, Pampa, Gran, Forte)
+            marcas = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR"]
             inicio = 0
             for idx, row in df_m.iterrows():
                 nombre_fila = str(row[cols[0]]).upper()
-                # Si la fila es un TOTAL de una de nuestras categorías
-                if "TOTAL" in nombre_fila and any(cat in nombre_fila for cat in categorias_principales):
+                if "TOTAL" in nombre_fila and any(m in nombre_fila for m in marcas):
                     df_m.at[idx, cols[3]] = df_m.iloc[inicio:idx, 3].sum()
-                    inicio = idx + 1 
+                    inicio = idx + 1
 
-            # 4. Cálculo del TOTAL GENERAL consolidado
+            # 3. CÁLCULO DEL TOTAL GENERAL (Suma de marcas + Red Secundaria)
             idx_total_general = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", na=False, case=False)].index
             if not idx_total_general.empty:
-                # Sumamos solo las filas que son Totales de Marca/Red para el Gran Total
-                suma_gran_total = df_m[
+                # Sumamos los subtotales de marcas
+                suma_marcas = df_m[
                     (df_m[cols[0]].str.contains("TOTAL", case=False)) & 
-                    (df_m[cols[0]].str.contains("|".join(categorias_principales), case=False))
+                    (df_m[cols[0]].str.contains("|".join(marcas), case=False))
                 ][cols[3]].sum()
                 
-                df_m.at[idx_total_general[0], cols[3]] = suma_gran_total
+                # Sumamos específicamente Red Secundaria (buscando la fila individual o su total)
+                suma_red = df_m[
+                    (df_m[cols[0]].str.contains("RED SECUNDARIA", case=False)) & 
+                    (~df_m[cols[0]].str.contains("TOTAL GENERAL", case=False)) # Evitar recursión
+                ][cols[3]].sum()
+                
+                # Si Red Secundaria ya está dentro de una marca (poco común), 
+                # esta lógica asegura que se sume al final de todas formas.
+                df_m.at[idx_total_general[0], cols[3]] = suma_marcas + suma_red
 
-            # 5. Formateo de Números y Porcentajes
+            # 4. Formateo y Porcentajes
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
@@ -237,16 +242,16 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             df_m[col_pct_n1] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             df_m[col_pct_n2] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
 
-            # --- ESTILOS (NEGRILLAS Y SEMÁFORO) ---
+            # --- ESTILOS ---
             def resaltar_totales(row):
                 if "TOTAL" in str(row[cols[0]]).upper():
                     return ['font-weight: bold; background-color: #f0f2f6'] * len(row)
                 return [''] * len(row)
 
             def semaforo_cumplimiento(val):
-                if val >= 1.0: color = '#28a745'     # Verde
-                elif val >= 0.8: color = '#fd7e14'   # Naranja
-                else: color = '#dc3545'              # Rojo
+                if val >= 1.0: color = '#28a745'
+                elif val >= 0.8: color = '#fd7e14'
+                else: color = '#dc3545'
                 return f'color: white; background-color: {color}; font-weight: bold; text-align: center'
 
             st.write("### ✅ Resumen de Cumplimiento")
@@ -261,4 +266,4 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
 
             st.dataframe(estilo_df, use_container_width=True, hide_index=True)
             
-        except Exception as e: st.error(f"Error en el cálculo: {e}")
+        except Exception as e: st.error(f"Error: {e}")
