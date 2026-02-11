@@ -1,16 +1,34 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
-# 1. CONFIGURACIÓN
+# 1. CONFIGURACIÓN E INYECCIÓN DE CSS PARA IMPRESIÓN
 st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
 
-# 2. MENÚ LATERAL
-st.sidebar.title("🚀 Menú de Gestión")
-pagina = st.sidebar.radio("Seleccione el Panel:", 
-                         ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇", "Cumplimiento de Objetivos 🎯"])
+st.markdown("""
+    <style>
+    @media print {
+        .stButton, .stFileUploader, .stSidebar, header, footer, [data-testid="stToolbar"] { 
+            display: none !important; 
+        }
+        .main .block-container { 
+            padding-top: 1rem !important; 
+            max-width: 100% !important; 
+        }
+        .element-container { 
+            margin-bottom: 2.5rem !important; 
+            page-break-inside: avoid !important; 
+        }
+        .stPlotlyChart { 
+            visibility: visible !important;
+            display: block !important; 
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# MAESTRO DE ASESORES (Tu lista original e intacta)
+# 2. MAESTRO DE ASESORES GLOBAL
 maestro_asesores = {
     "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
     "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -45,7 +63,7 @@ maestro_asesores = {
     "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
     "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
     "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA",
-    "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
+    "MARTIN POTREBICA": "FORTECAR NUEVE de JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
     "1119 ROMAN GAVINO": "FORTECAR NUEVE DE JULIO", "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
     "1118 BRENDA AGUIRRE": "FORTECAR OLAVARRIA",
     "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "GERMAN CALVO": "SUCURSAL VIRTUAL",
@@ -57,52 +75,121 @@ maestro_asesores = {
 def limpiar_texto(t):
     return " ".join(str(t).split()).replace(".", "").strip().upper()
 
+# 3. MENÚ LATERAL
+st.sidebar.title("🚀 Menú de Gestión")
+pagina = st.sidebar.radio("Seleccione el Panel:", 
+                         ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇", "Cumplimiento de Objetivos 🎯"])
+
 # =========================================================
-# OPCIÓN 1: PANEL DE OBJETIVOS SUCURSALES (Archivo Nuevo)
+# OPCIÓN 1: PANEL DE OBJETIVOS SUCURSALES (INTACTO)
 # =========================================================
 if pagina == "Panel de Objetivos Sucursales":
-    st.title("📊 Panel de Control de Objetivos")
-    u_meta = st.file_uploader("Subir archivo 'cumplimiento de objetivos'", type=["xlsx"], key="u_meta_1")
+    COLORES_MARCAS = {
+        "PAMPAWAGEN": "#001E50", "FORTECAR": "#102C54", "GRANVILLE": "#FFCE00",
+        "CITROEN SN": "#E20613", "OPENCARS": "#00A1DF", "RED SECUNDARIA": "#4B4B4B", "OTRAS": "#999999"
+    }
 
-    if u_meta:
+    st.title("📊 Panel de Control de Objetivos Sucursales")
+    uploaded_file = st.file_uploader("Sube el archivo Excel de Objetivos", type=["xlsx"], key="obj_key_panel")
+
+    if uploaded_file:
         try:
-            df = pd.read_excel(u_meta)
-            # Limpiar nombres de columnas (quita espacios extras)
+            df = pd.read_excel(uploaded_file)
             df.columns = [str(c).strip() for c in df.columns]
+            col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
+
+            df['Marca'] = "OTRAS"
+            marca_actual = "OTRAS"
+            for i, row in df.iterrows():
+                texto = str(row[col_obj]).upper()
+                if "OPENCARS" in texto: marca_actual = "OPENCARS"
+                elif "PAMPAWAGEN" in texto: marca_actual = "PAMPAWAGEN"
+                elif "FORTECAR" in texto: marca_actual = "FORTECAR"
+                elif "GRANVILLE" in texto: marca_actual = "GRANVILLE"
+                elif "CITROEN" in texto: marca_actual = "CITROEN SN"
+                elif "RED" in texto: marca_actual = "RED SECUNDARIA"
+                df.at[i, 'Marca'] = marca_actual
+
+            df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].copy()
+            df_suc = df_suc.dropna(subset=[col_n1])
             
-            # Identificar columnas por posición para evitar errores de nombres
-            col_suc = df.columns[0]   # OBJETIVOS
-            col_n1 = df.columns[1]    # Nivel 1
-            col_log = df.columns[3]   # Logrado
+            st.sidebar.header("🔍 Filtros de Análisis")
+            opciones_marcas = ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist())
+            marca_sel = st.sidebar.selectbox("Seleccionar Empresa:", opciones_marcas)
 
-            # Convertir a números y limpiar filas vacías
-            df[col_n1] = pd.to_numeric(df[col_n1], errors='coerce').fillna(0)
-            df[col_log] = pd.to_numeric(df[col_log], errors='coerce').fillna(0)
+            df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
             
-            # Filtrar filas de totales y vacíos
-            df_plot = df[~df[col_suc].str.contains("TOTAL", na=False, case=False)].copy()
-            df_plot = df_plot[df_plot[col_n1] > 0] # Solo sucursales con objetivo
+            # Limpieza numérica
+            df_final[col_log] = pd.to_numeric(df_final[col_log], errors='coerce').fillna(0)
+            df_final[col_n1] = pd.to_numeric(df_final[col_n1], errors='coerce').fillna(1) # evitar div cero
+            
+            df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).round(0).astype(int)
+            df_final['%_txt'] = df_final['%_int'].astype(str) + "%"
+            
+            def calc_faltante(logrado, objetivo):
+                diff = objetivo - logrado
+                return f"{int(diff)} un." if diff > 0 else "✅ Logrado"
 
-            st.write("### 🏢 Rendimiento por Sucursal")
-            fig = px.bar(df_plot, x=col_suc, y=[col_log, col_n1], 
-                         barmode='group', text_auto=True,
-                         labels={'value': 'Unidades', 'variable': 'Métrica'})
-            st.plotly_chart(fig, use_container_width=True)
+            df_final['Faltante N1'] = df_final.apply(lambda x: calc_faltante(x[col_log], x[col_n1]), axis=1)
+            df_final['Faltante N2'] = df_final.apply(lambda x: calc_faltante(x[col_log], x[col_n2]), axis=1)
 
-            st.dataframe(df_plot[[col_suc, col_n1, col_log]], use_container_width=True, hide_index=True)
+            st.subheader(f"📍 Resumen de Gestión: {marca_sel}")
+            t_log, t_n1, t_n2 = df_final[col_log].sum(), df_final[col_n1].sum(), df_final[col_n2].sum()
+            cumpl_global = int((t_log/t_n1)*100) if t_n1 > 0 else 0
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Logrado Total", f"{int(t_log)}")
+            c2.metric("Objetivo N1", f"{int(t_n1)}")
+            c3.metric("Objetivo N2", f"{int(t_n2)}")
+            c4.metric("% Global (N1)", f"{cumpl_global}%")
+
+            st.divider()
+            st.write("### 🏢 Rendimiento por Sucursal (Unidades)")
+            fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group',
+                           color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
+            fig_bar.update_traces(textposition='outside')
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+            if marca_sel == "GRUPO TOTAL":
+                st.write("### 🏆 Ranking de Cumplimiento por Marca (Objetivo Nivel 1)")
+                ranking_m = df_final.groupby('Marca').agg({col_log: 'sum', col_n1: 'sum'}).reset_index()
+                ranking_m['%'] = (ranking_m[col_log] / ranking_m[col_n1] * 100).round(0).astype(int)
+                ranking_m = ranking_m.sort_values('%', ascending=True)
+                fig_rank = px.bar(ranking_m, x='%', y='Marca', orientation='h', text_auto=True,
+                                 color='Marca', color_discrete_map=COLORES_MARCAS)
+                st.plotly_chart(fig_rank, use_container_width=True)
+
+            st.write("### 🌡️ Avance Global")
+            fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=cumpl_global, number={'suffix': "%"},
+                gauge={'axis': {'range': [0, 120]}, 'bar': {'color': "#323232"},
+                       'steps': [{'range': [0, 80], 'color': "#FF4B4B"}, {'range': [80, 100], 'color': "#F9D71C"}, {'range': [100, 120], 'color': "#00CC96"}]}))
+            st.plotly_chart(fig_gauge, use_container_width=True)
+
+            st.divider()
+            col_l, col_a = st.columns(2)
+            cols_mostrar = [col_obj, '%_txt', 'Faltante N1', 'Faltante N2']
+            with col_l:
+                st.success("✨ Líderes (>= 80%)")
+                st.table(df_final[df_final['%_int'] >= 80].sort_values('%_int', ascending=False)[cols_mostrar].set_index(col_obj))
+            with col_a:
+                st.error("⚠️ Alerta (< 80%)")
+                st.table(df_final[df_final['%_int'] < 80].sort_values('%_int')[cols_mostrar].set_index(col_obj))
+
+            if st.button("📄 GENERAR REPORTE PDF COMPLETO"):
+                st.components.v1.html("<script>window.parent.print();</script>", height=0)
 
         except Exception as e:
-            st.error(f"Hubo un problema al leer el archivo: {e}")
+            st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING (Tu código original mantenido)
+# OPCIÓN 2: RANKING (INTACTO)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_f")
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_f")
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_rank")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_rank")
 
     if u45 and u53:
         try:
@@ -113,7 +200,7 @@ elif pagina == "Ranking de Asesores 🥇":
             df45_raw = leer_archivo(u45)
             df53_raw = leer_archivo(u53)
 
-            # --- PROCESAMIENTO (TU LÓGICA ORIGINAL) ---
+            # --- PROCESAMIENTO ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -140,6 +227,9 @@ elif pagina == "Ranking de Asesores 🥇":
             ranking_base['Sucursal'] = ranking_base['KEY'].map(maestro_limpio)
             ranking_base = ranking_base.dropna(subset=['Sucursal']).copy()
 
+            for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']:
+                ranking_base[c] = ranking_base[c].astype(int)
+
             ranking_base['TOTAL'] = ranking_base['VN'] + ranking_base['VO'] + ranking_base['ADJ'] + ranking_base['VE'] + ranking_base['PDA']
             ranking_base['Prioridad'] = ranking_base['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking_base = ranking_base.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
@@ -152,68 +242,44 @@ elif pagina == "Ranking de Asesores 🥇":
                 if i < len(ranking_base):
                     asesor = ranking_base.iloc[i]
                     with podio_cols[i]:
-                        st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas_p[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{int(asesor["TOTAL"])} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1>{medallas_p[i]}</h1><b>{asesor["KEY"]}</b><h2>{asesor["TOTAL"]} u.</h2><span>{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
 
             st.divider()
-            st.dataframe(ranking_base[['KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'Sucursal']], use_container_width=True, hide_index=True)
+            # Tabla Ranking
+            ranks = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking_base))]
+            ranking_base.insert(0, 'Rank', ranks)
+            st.dataframe(ranking_base[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'Sucursal']], use_container_width=True, hide_index=True)
 
         except Exception as e:
             st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (Cruzando U45+U53 vs Excel Metas)
+# OPCIÓN 3: CUMPLIMIENTO (Sincronizado con Ventas Reales)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
-    st.title("🎯 Cumplimiento: Real vs Objetivos")
+    st.title("🎯 Cumplimiento de Objetivos: Real vs Metas")
     
     col1, col2, col3 = st.columns(3)
-    with col1: u45_o = st.file_uploader("U45", type=["xlsx", "csv"], key="c_u45")
-    with col2: u53_o = st.file_uploader("U53", type=["xlsx", "csv"], key="c_u53")
-    with col3: meta_o = st.file_uploader("Archivo Metas", type=["xlsx"], key="c_meta")
+    with col1: u45_c = st.file_uploader("Subir U45", type=["xlsx", "csv"], key="c_u45")
+    with col2: u53_c = st.file_uploader("Subir U53", type=["xlsx", "csv"], key="c_u53")
+    with col3: meta_c = st.file_uploader("Subir cumplimiento de objetivos.xlsx", type=["xlsx"], key="c_meta")
 
-    if u45_o and u53_o and meta_o:
+    if u45_c and u53_c and meta_c:
         try:
-            # 1. Procesar Ventas Reales
-            d45 = pd.read_excel(u45_o) if u45_o.name.endswith('xlsx') else pd.read_csv(u45_o)
-            d53 = pd.read_excel(u53_o) if u53_o.name.endswith('xlsx') else pd.read_csv(u53_o)
+            # 1. Calcular Ventas Reales por Sucursal desde U45/U53
+            d45 = pd.read_excel(u45_c) if u45_c.name.endswith('xlsx') else pd.read_csv(u45_c)
+            d53 = pd.read_excel(u53_c) if u53_c.name.endswith('xlsx') else pd.read_csv(u53_c)
             
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
-
-            # Contar U45
+            
+            # Limpiar datos ventas
             c_v_45 = d45.columns[4]
             d45['Sucursal'] = d45[c_v_45].apply(limpiar_texto).map(maestro_limpio)
-            real45 = d45.groupby('Sucursal').size()
-
-            # Contar U53
+            
             c_v_53 = d53.columns[0]
             d53['Sucursal'] = d53[c_v_53].apply(limpiar_texto).map(maestro_limpio)
-            real53 = d53.groupby('Sucursal').size()
-
-            # Sumar ambos
-            reales = (real45.add(real53, fill_value=0)).reset_index(name='Ventas_Reales')
-            reales['Sucursal_Clean'] = reales['Sucursal'].apply(limpiar_texto)
-
-            # 2. Procesar Metas
-            df_m = pd.read_excel(meta_o)
-            df_m.columns = [str(c).strip() for c in df_m.columns]
-            col_suc_meta = df_m.columns[0]
-            col_obj_n1 = df_m.columns[1]
             
-            df_m['Sucursal_Clean'] = df_m[col_suc_meta].apply(limpiar_texto)
-            
-            # 3. Unir
-            final = pd.merge(df_m, reales[['Sucursal_Clean', 'Ventas_Reales']], on='Sucursal_Clean', how='left').fillna(0)
-            
-            # Calcular indicadores
-            final['Objetivo'] = pd.to_numeric(final[col_obj_n1], errors='coerce').fillna(0)
-            final['Logrado'] = final['Ventas_Reales'].astype(int)
-            final['%'] = (final['Logrado'] / final['Objetivo'].replace(0,1) * 100).round(1)
-
-            # Mostrar solo filas con objetivos reales
-            final_view = final[final['Objetivo'] > 0][[col_suc_meta, 'Objetivo', 'Logrado', '%']]
-            
-            st.write("### 📊 Tabla de Cumplimiento")
-            st.dataframe(final_view.style.highlight_max(axis=0), use_container_width=True, hide_index=True)
-
-        except Exception as e:
-            st.error(f"Error en el cruce de datos: {e}")
+            # Sumar todo (Ranking Real)
+            v_reales = pd.concat([d45['Sucursal'], d53['Sucursal']]).value_counts().reset_index()
+            v_reales.columns = ['Sucursal_Nombre', 'Ventas_Calculadas']
+            v_reales['Sucursal_
