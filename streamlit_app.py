@@ -180,7 +180,7 @@ elif pagina == "Ranking de Asesores 🥇":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (SINCRO AUTOMÁTICA + ENTEROS)
+# OPCIÓN 3: CUMPLIMIENTO (SINCRO AUTOMÁTICA + FORMATO %)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -194,35 +194,52 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
         try:
             df_m = pd.read_excel(f_meta)
             df_m.columns = [str(c).strip() for c in df_m.columns]
-            # Columnas fijas: 0: Sucursal, 1: N1, 2: N2, 3: Logrado
-            cols = df_m.columns
-            df_m[cols[3]] = 0 # Logrado
             
+            # Identificamos columnas por posición para evitar errores de nombres
+            # 0: Sucursal, 1: N1, 2: N2, 3: Logrado, 4: %N1, 5: %N2
+            cols = df_m.columns
+            df_m[cols[3]] = 0  # Inicializamos Logrado en 0
+            
+            # Cruzar datos de la memoria con el Excel de metas
             for idx, row in df_m.iterrows():
                 suc_ex = str(row[cols[0]]).upper()
-                if "TOTAL" in suc_ex: continue
+                if "TOTAL" in suc_ex: 
+                    continue
                 for s_mem, val in ventas_reales.items():
-                    if s_mem.upper() in suc_ex: df_m.at[idx, cols[3]] = val
+                    if s_mem.upper() in suc_ex: 
+                        df_m.at[idx, cols[3]] = val
 
-            # Cálculo de Totales
+            # Recalcular los totales intermedios y finales en la columna Logrado
             indices_tot = df_m[df_m[cols[0]].str.contains("TOTAL", na=False, case=False)].index
             inicio = 0
             for fin in indices_tot:
                 df_m.at[fin, cols[3]] = df_m.iloc[inicio:fin, 3].sum()
                 inicio = fin + 1
             
-            # Porcentajes y conversión a ENTEROS
+            # Limpieza de datos numéricos
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
             
-            # % como enteros
-            df_m[cols[4]] = ((df_m[cols[3]] / df_m[cols[1]]) * 100).fillna(0).astype(int)
-            df_m[cols[5]] = ((df_m[cols[3]] / df_m[cols[2]]) * 100).fillna(0).astype(int)
+            # Cálculo de porcentajes (como decimales para el formateo posterior)
+            df_m[cols[4]] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
+            df_m[cols[5]] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             
-            # Renombrar para claridad
+            # Renombrar para consistencia
             df_m = df_m.rename(columns={cols[4]: "% N1", cols[5]: "% N2"})
             
-            st.write("### ✅ Cumplimiento por Sucursal")
-            st.dataframe(df_m, use_container_width=True, hide_index=True)
-        except Exception as e: st.error(f"Error: {e}")
+            st.write("### ✅ Resumen de Cumplimiento")
+            
+            # Aplicar formato: Enteros para unidades y % para las últimas dos columnas
+            df_estilado = df_m.style.format({
+                cols[1]: "{:,.0f}",
+                cols[2]: "{:,.0f}",
+                cols[3]: "{:,.0f}",
+                "% N1": "{:.0%}",
+                "% N2": "{:.0%}"
+            })
+
+            st.dataframe(df_estilado, use_container_width=True, hide_index=True)
+            
+        except Exception as e: 
+            st.error(f"Error al procesar cumplimiento: {e}")
