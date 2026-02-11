@@ -329,4 +329,141 @@ elif pagina == "Ranking de Asesores 🥇":
 
         except Exception as e:
             st.error(f"Error: {e}")
+          # =========================================================
+# OPCIÓN 3: CUMPLIMIENTO DE OBJETIVOS
+# =========================================================
+elif pagina == "Cumplimiento de Objetivos 🎯":
+    st.title("🎯 Cumplimiento de Objetivos por Sucursal")
+    
+    # Mantenemos el mismo maestro de asesores
+    maestro_asesores = {
+        "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
+        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
+        "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
+        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS", "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
+        "45 LAURA CASSANITI": "FORTECAR JUNIN", "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
+        "784 GUSTAVO RIVAS": "GRANVILLE TRELEW", "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
+        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO", "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
+        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO", "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
+        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA", "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
+        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
+        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
+        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", "401 JOSE JUAN": "GRANVILLE JUNIN",
+        "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+        "913 NICOLAS MALDONADO": "GRANVILLE CITROEN SAN NICOLAS", "462 JORGE FERRAIUOLO": "FORTECAR JUNIN",
+        "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA", "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO",
+        "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN", "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN",
+        "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY", "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO",
+        "1003 JUAN IGNACIO ARCE": "OPENCARS JUNIN", "1048 BRUNO VIGNALE": "OPENCARS JUNIN",
+        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA", "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS",
+        "1047 GISELL LLANOS": "GRANVILLE COMODORO", "1088 FRANCO VEGA": "GRANVILLE PERGAMINO",
+        "402 CRISTIAN LOPEZ": "FORTECAR JUNIN", "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO",
+        "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO", "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS",
+        "781 SILVANA CHAMINE": "GRANVILLE MADRYN", "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN",
+        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA", "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS",
+        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN", "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS",
+        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO", "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY",
+        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS", "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA",
+        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO", "1112 AGUSTINA AUZA": "GRANVILLE MADRYN",
+        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN", "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
+        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
+        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
+        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA",
+        "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
+        "1119 ROMAN GAVINO": "FORTECAR NUEVE de JULIO", "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
+        "1118 BRENDA AGUIRRE": "FORTECAR OLAVARRIA",
+        # VIRTUALES
+        "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "GERMAN CALVO": "SUCURSAL VIRTUAL",
+        "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL", "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
+        "CAMILA GARCIA": "SUCURSAL VIRTUAL", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
+        "PILAR ALCOBA": "SUCURSAL VIRTUAL", "ROCIO FERNANDEZ": "SUCURSAL VIRTUAL"
+    }
+
+    c1, c2, c3 = st.columns(3)
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_obj")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_obj")
+    with c3: u_obj = st.file_uploader("Archivo Objetivos", type=["xlsx", "csv"], key="u_obj")
+
+    if u45 and u53 and u_obj:
+        try:
+            def leer_f(f):
+                if f.name.endswith('.csv'): return pd.read_csv(f)
+                return pd.read_excel(f)
+
+            df45_raw = leer_f(u45)
+            df53_raw = leer_f(u53)
+            df_obj = leer_f(u_obj)
+
+            def limpiar_t(t): return " ".join(str(t).split()).replace(".", "").strip().upper()
+            
+            # --- CÁLCULO DE LOGRADOS ---
+            maestro_limpio = {limpiar_t(k): v for k, v in maestro_asesores.items()}
+            
+            # Columnas clave de ventas
+            c_v_45 = df45_raw.columns[4]
+            c_v_53 = df53_raw.columns[0]
+            c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
+            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
+
+            # Filtrar U45 (excluir anulados y planes)
+            df45_f = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
+            df45_f['Sucursal'] = df45_f[c_v_45].apply(limpiar_t).map(maestro_limpio)
+            
+            # Procesar U53
+            df53_raw['Sucursal'] = df53_raw[c_v_53].apply(limpiar_t).map(maestro_limpio)
+            
+            # Sumar por sucursal
+            sum_45 = df45_f.groupby('Sucursal').size()
+            sum_53 = df53_raw.groupby('Sucursal').size()
+            ventas_suc = (sum_45.add(sum_53, fill_value=0)).reset_index(name='Logrado')
+
+            # --- ARMAR TABLA FINAL ---
+            # Cruzamos el archivo de objetivos con lo logrado
+            df_final = pd.merge(df_obj, ventas_suc, on='Sucursal', how='left').fillna(0)
+            
+            # Cálculo de columna "Faltan" (Objetivo - Logrado, mínimo 0)
+            df_final['Faltan'] = (df_final['Objetivo'] - df_final['Logrado']).apply(lambda x: int(x) if x > 0 else 0)
+            
+            # Cálculo de %
+            df_final['%'] = (df_final['Logrado'] / df_final['Objetivo'].replace(0, 1) * 100).round(1)
+
+            # Reordenar columnas para que coincida con el pedido
+            df_final = df_final[['Sucursal', 'Objetivo', 'Logrado', 'Faltan', '%']]
+
+            # Función de Semáforo y Centrado
+            def estilo_objetivos(row):
+                val = row['%']
+                if val >= 100:
+                    color = '#28a745' # Verde
+                elif val >= 80:
+                    color = '#fd7e14' # Naranja
+                else:
+                    color = '#dc3545' # Rojo
+                
+                # Estilo: centrado para todos, color solo para la columna %
+                estilos = ['text-align: center'] * len(row)
+                estilos[4] = f'text-align: center; color: {color}; font-weight: bold'
+                return estilos
+
+            st.write("### 📊 Cumplimiento de Ventas Totales")
+            st.dataframe(
+                df_final.style.apply(estilo_objetivos, axis=1),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # Resumen general al final
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                st.metric("Total Objetivo Grupo", int(df_final['Objetivo'].sum()))
+            with col_t2:
+                total_l = int(df_final['Logrado'].sum())
+                total_o = int(df_final['Objetivo'].sum())
+                pct_g = round((total_l / total_o * 100), 1) if total_o > 0 else 0
+                st.metric("Total Logrado Grupo", total_l, f"{pct_g}% del Objetivo")
+
+        except Exception as e:
+            st.error(f"Error al procesar objetivos: {e}")
+        
 
