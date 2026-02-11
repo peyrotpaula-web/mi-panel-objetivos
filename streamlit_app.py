@@ -159,7 +159,7 @@ if pagina == "Panel de Objetivos Sucursales":
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # 1. MAESTRO ACTUALIZADO CON SUCURSAL VIRTUAL
+    # 1. MAESTRO ACTUALIZADO
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -220,7 +220,7 @@ elif pagina == "Ranking de Asesores 🥇":
             def limpiar_texto(t):
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-            # --- PROCESAMIENTO ---
+            # --- PROCESAMIENTO BASE ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -242,55 +242,77 @@ elif pagina == "Ranking de Asesores 🥇":
             df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-            ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
+            ranking_base = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
-            ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
-            ranking = ranking.dropna(subset=['Sucursal']).copy()
+            ranking_base['Sucursal'] = ranking_base['KEY'].map(maestro_limpio)
+            ranking_base = ranking_base.dropna(subset=['Sucursal']).copy()
 
             for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']:
-                ranking[c] = ranking[c].astype(int)
+                ranking_base[c] = ranking_base[c].astype(int)
 
-            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
-            ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
-            ranking = ranking.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
+            ranking_base['TOTAL'] = ranking_base['VN'] + ranking_base['VO'] + ranking_base['ADJ'] + ranking_base['VE'] + ranking_base['PDA']
+            ranking_base['Prioridad'] = ranking_base['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
+            ranking_base = ranking_base.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
 
-            # --- PODIO ---
-            st.write("## 🎖️ Cuadro de Honor")
-            podio_cols = st.columns(3)
-            medallas, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
-            for i in range(3):
-                if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
-                    asesor = ranking.iloc[i]
-                    with podio_cols[i]:
-                        st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
+            # --- SECCIÓN DE FILTROS DINÁMICOS ---
+            st.write("### 🔍 Buscador y Filtros")
+            col_f1, col_f2 = st.columns(2)
+            
+            with col_f1:
+                # Permite escribir y seleccionar múltiples sucursales
+                sucursales_disp = sorted(ranking_base['Sucursal'].unique())
+                filtro_sucursal = st.multiselect("Filtrar por Sucursal:", sucursales_disp)
+            
+            with col_f2:
+                # Permite buscar por nombre de asesor
+                filtro_asesor = st.text_input("Buscar Asesor (Escribe el nombre):")
+
+            # Aplicar los filtros al dataframe
+            ranking = ranking_base.copy()
+            if filtro_sucursal:
+                ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
+            if filtro_asesor:
+                ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
+
+            # --- PODIO (Solo se muestra si no hay filtros aplicados para mantener la jerarquía) ---
+            if not filtro_sucursal and not filtro_asesor:
+                st.write("## 🎖️ Cuadro de Honor")
+                podio_cols = st.columns(3)
+                medallas, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
+                for i in range(3):
+                    if i < len(ranking):
+                        asesor = ranking.iloc[i]
+                        with podio_cols[i]:
+                            st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
 
             st.divider()
 
-            # --- TABLA DETALLADA ---
-            st.write("### 📊 Desglose de Ventas")
+            # --- TABLA DETALLADA CON ESTILO ---
+            st.write("### 📊 Ranking Detallado")
             
-            # Agregamos Rank
-            ranking.insert(0, 'Rank', [f"{i+1}°" for i in range(len(ranking))])
+            # Recalcular Rank según el filtro actual
+            ranking['Rank'] = [f"{i+1}°" for i in range(len(ranking))]
+            
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
 
-            # Función para colorear texto sin negrita
             def color_texto(row):
                 if row['Sucursal'] == "SUCURSAL VIRTUAL":
-                    return ['color: #1a73e8; font-weight: normal'] * len(row) # Azul profesional
+                    return ['color: #1a73e8; font-weight: normal'] * len(row)
                 elif row['Sucursal'] == "RED SECUNDARIA":
-                    return ['color: #8e44ad; font-weight: normal'] * len(row) # Violeta suave
+                    return ['color: #8e44ad; font-weight: normal'] * len(row)
                 return [''] * len(row)
 
-            # Mostramos la tabla principal con filtros habilitados
-            # st.dataframe activa filtros automáticamente si pasas el dataframe
             st.dataframe(
                 final_display.style.apply(color_texto, axis=1),
                 use_container_width=True,
                 hide_index=True
             )
 
-            # --- FILA DE TOTALES ---
+            # --- FILA DE TOTALES (Basada en la selección de filtros) ---
+            # Si filtramos, el TOTAL debe representar solo lo que estamos viendo
+            # pero excluyendo virtual según la regla de negocio
             df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
+            
             totales = pd.DataFrame({
                 'Métrica': ['TOTAL'],
                 'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
@@ -300,7 +322,6 @@ elif pagina == "Ranking de Asesores 🥇":
             })
 
             st.table(totales.set_index('Métrica'))
-            st.info("💡 Tip: Pasa el mouse sobre el encabezado de cualquier columna para ver las opciones de filtro y búsqueda.")
 
         except Exception as e:
             st.error(f"Error: {e}")
