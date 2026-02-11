@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -155,12 +154,13 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
+# # =========================================================
 # OPCIÓN 2: RANKING CON PODIO VISUAL Y JERARQUÍA
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # 1. MAESTRO DE ASESORES
+    # 1. MAESTRO DE ASESORES ACTUALIZADO
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -221,7 +221,7 @@ elif pagina == "Ranking de Asesores 🥇":
             def limpiar_texto(t):
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-            # --- PROCESAMIENTO (Igual al anterior) ---
+            # --- PROCESAMIENTO U45 ---
             c_v_45 = df45_raw.columns[4]
             c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
@@ -238,11 +238,13 @@ elif pagina == "Ranking de Asesores 🥇":
                 'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
             })).reset_index()
 
+            # --- PROCESAMIENTO U53 ---
             c_v_53 = df53_raw.columns[0]
             df53 = df53_raw.copy()
             df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
+            # --- MERGE Y ORDENAMIENTO ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
@@ -252,67 +254,74 @@ elif pagina == "Ranking de Asesores 🥇":
                 ranking[c] = ranking[c].astype(int)
 
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
+            
+            # Prioridad para que Red Secundaria aparezca abajo
             ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking = ranking.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
+            
+            # Asignar Rango/Medalla
+            ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
 
-            # --- PODIO ---
+            # --- VISUALIZACIÓN: PODIO ---
             st.write("## 🎖️ Cuadro de Honor")
             podio_cols = st.columns(3)
             medallas, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
+
             for i in range(3):
                 if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
                     asesor = ranking.iloc[i]
                     with podio_cols[i]:
-                        st.markdown(f'<div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{medallas[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;">
+                            <h1 style="margin: 0;">{medallas[i]}</h1>
+                            <p style="font-weight: bold; margin: 5px 0;">{asesor['KEY']}</p>
+                            <h2 style="color: #1f77b4; margin: 0;">{asesor['TOTAL']} <small>u.</small></h2>
+                            <span style="font-size: 0.8em; color: gray;">{asesor['Sucursal']}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
 
             st.divider()
 
-            # --- TABLA DETALLADA CON FILTROS Y COLORES ---
+            # --- TABLA DETALLADA ---
             st.write("### 📊 Desglose de Ventas (Filtrable)")
             
-            # Formatear el ranking
-            display_df = ranking[['KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].copy()
-            display_df.rename(columns={'KEY': 'Asesor'}, inplace=True)
+            # Preparar DF de visualización
+            display_df = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
             
-            # Función para colorear filas
+            # Lógica de colores por fila
             def color_filas(row):
                 if row['Sucursal'] == "SUCURSAL VIRTUAL":
-                    return ['background-color: #D1E8FF; color: black'] * len(row) # Azul claro
+                    return ['background-color: #D1E8FF; color: black'] * len(row) # Azul
                 elif row['Sucursal'] == "RED SECUNDARIA":
-                    return ['background-color: #E6E0F8; color: black'] * len(row) # Violeta claro
+                    return ['background-color: #E6E0F8; color: black'] * len(row) # Violeta
                 return [''] * len(row)
 
-            # Totales (Excluyendo Virtual)
-            df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
-            row_total = pd.DataFrame({
-                'Asesor': ['TOTAL OPERATIVO (Excl. Virtual)'],
-                'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
-                'PDA': [df_para_totales['PDA'].sum()], 'ADJ': [df_para_totales['ADJ'].sum()],
-                'VE': [df_para_totales['VE'].sum()], 'TOTAL': [df_para_totales['TOTAL'].sum()],
-                'TOMA_VO': [df_para_totales['TOMA_VO'].sum()], 'Sucursal': ['TOTAL']
-            })
-
-            # Aplicar Estilos y Filtros
-            # st.column_config permite habilitar filtros por columna
+            # Mostrar tabla interactiva (Streamlit habilita filtros automáticamente)
             st.dataframe(
                 display_df.style.apply(color_filas, axis=1),
                 use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Asesor": st.column_config.TextColumn("Asesor", help="Nombre del vendedor"),
-                    "Sucursal": st.column_config.SelectColumn("Sucursal", options=list(display_df['Sucursal'].unique()))
-                }
+                hide_index=True
             )
 
-            # Mostrar la fila de totales por separado para que no se pierda al filtrar
-            st.table(row_total.set_index('Asesor'))
+            # --- FILA DE TOTALES EXCLUYENTES ---
+            df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
+            row_total = pd.DataFrame({
+                'Métrica': ['TOTAL OPERATIVO (Excl. Virtual)'],
+                'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
+                'PDA': [df_para_totales['PDA'].sum()], 'ADJ': [df_para_totales['ADJ'].sum()],
+                'VE': [df_para_totales['VE'].sum()], 'TOTAL': [df_para_totales['TOTAL'].sum()],
+                'TOMA_VO': [df_para_totales['TOMA_VO'].sum()]
+            })
 
+            st.table(row_total.set_index('Métrica'))
+
+            # Leyenda de colores
             st.markdown("""
-            <div style="display: flex; gap: 20px; font-size: 0.8em; margin-top: 10px;">
-                <span>🟦 <b>Azul:</b> Sucursal Virtual</span>
-                <span>🟪 <b>Violeta:</b> Red Secundaria</span>
+            <div style="display: flex; gap: 20px; font-size: 0.85em; margin-top: 10px;">
+                <span style="background-color: #D1E8FF; padding: 4px 10px; border-radius: 5px; color: black; border: 1px solid #A5C8ED;">🟦 <b>Sucursal Virtual</b></span>
+                <span style="background-color: #E6E0F8; padding: 4px 10px; border-radius: 5px; color: black; border: 1px solid #CDC4ED;">🟪 <b>Red Secundaria</b></span>
             </div>
             """, unsafe_allow_html=True)
 
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error en el procesamiento: {e}")
