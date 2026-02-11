@@ -180,7 +180,7 @@ elif pagina == "Ranking de Asesores 🥇":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (SINCRO AUTOMÁTICA + FORMATO %)
+# OPCIÓN 3: CUMPLIMIENTO (SINCRO, NEGRILLAS Y SEMÁFORO)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -194,52 +194,60 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
         try:
             df_m = pd.read_excel(f_meta)
             df_m.columns = [str(c).strip() for c in df_m.columns]
-            
-            # Identificamos columnas por posición para evitar errores de nombres
-            # 0: Sucursal, 1: N1, 2: N2, 3: Logrado, 4: %N1, 5: %N2
             cols = df_m.columns
-            df_m[cols[3]] = 0  # Inicializamos Logrado en 0
+            df_m[cols[3]] = 0 # Logrado
             
-            # Cruzar datos de la memoria con el Excel de metas
+            # 1. Sincronización con Memoria
             for idx, row in df_m.iterrows():
                 suc_ex = str(row[cols[0]]).upper()
-                if "TOTAL" in suc_ex: 
-                    continue
+                if "TOTAL" in suc_ex: continue
                 for s_mem, val in ventas_reales.items():
-                    if s_mem.upper() in suc_ex: 
-                        df_m.at[idx, cols[3]] = val
+                    if s_mem.upper() in suc_ex: df_m.at[idx, cols[3]] = val
 
-            # Recalcular los totales intermedios y finales en la columna Logrado
+            # 2. Cálculo de Totales
             indices_tot = df_m[df_m[cols[0]].str.contains("TOTAL", na=False, case=False)].index
             inicio = 0
             for fin in indices_tot:
                 df_m.at[fin, cols[3]] = df_m.iloc[inicio:fin, 3].sum()
                 inicio = fin + 1
             
-            # Limpieza de datos numéricos
+            # 3. Conversión de tipos y creación de columnas de %
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
             
-            # Cálculo de porcentajes (como decimales para el formateo posterior)
-            df_m[cols[4]] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
-            df_m[cols[5]] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
-            
-            # Renombrar para consistencia
-            df_m = df_m.rename(columns={cols[4]: "% N1", cols[5]: "% N2"})
-            
+            col_pct_n1 = "% N1"
+            col_pct_n2 = "% N2"
+            df_m[col_pct_n1] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
+            df_m[col_pct_n2] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
+
+            # --- FUNCIONES DE ESTILO ---
+            def resaltar_totales(row):
+                if "TOTAL" in str(row[cols[0]]).upper():
+                    return ['font-weight: bold; background-color: #f0f2f6'] * len(row)
+                return [''] * len(row)
+
+            def semaforo_cumplimiento(val):
+                if val >= 1.0: color = '#28a745'     # Verde (100%+)
+                elif val >= 0.8: color = '#fd7e14'   # Naranja (80% - 99.9%)
+                else: color = '#dc3545'              # Rojo (<80%)
+                return f'color: white; background-color: {color}; font-weight: bold; text-align: center'
+
+            # --- APLICACIÓN DE ESTILOS ---
             st.write("### ✅ Resumen de Cumplimiento")
             
-            # Aplicar formato: Enteros para unidades y % para las últimas dos columnas
-            df_estilado = df_m.style.format({
-                cols[1]: "{:,.0f}",
-                cols[2]: "{:,.0f}",
-                cols[3]: "{:,.0f}",
-                "% N1": "{:.0%}",
-                "% N2": "{:.0%}"
-            })
-
-            st.dataframe(df_estilado, use_container_width=True, hide_index=True)
+            df_final = df_m[[cols[0], cols[1], cols[2], cols[3], col_pct_n1, col_pct_n2]]
             
-        except Exception as e: 
-            st.error(f"Error al procesar cumplimiento: {e}")
+            estilo_df = df_final.style.apply(resaltar_totales, axis=1) \
+                .map(semaforo_cumplimiento, subset=[col_pct_n1, col_pct_n2]) \
+                .format({
+                    cols[1]: "{:,.0f}",
+                    cols[2]: "{:,.0f}",
+                    cols[3]: "{:,.0f}",
+                    col_pct_n1: "{:.1%}",
+                    col_pct_n2: "{:.1%}"
+                })
+
+            st.dataframe(estilo_df, use_container_width=True, hide_index=True)
+            
+        except Exception as e: st.error(f"Error: {e}")
