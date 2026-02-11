@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -154,21 +155,54 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING DE ASESORES (VERSIÓN ROBUSTA CON VIRTUALES)
+# OPCIÓN 2: RANKING CON PODIO VISUAL Y JERARQUÍA
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # 1. Definición de Virtuales
-    asesores_virtuales = [
-        "FEDERICO RUBINO", "GERMAN CALVO", "JAZMIN BERAZATEGUI", 
-        "LUISANA LEDESMA", "CAMILA GARCIA", "CARLA VALLEJO", 
-        "PILAR ALCOBA", "ROCIO FERNANDEZ"
-    ]
+    # Mantenemos tu maestro de asesores original
+    maestro_asesores = {
+        "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
+        "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
+        "682 TOMAS VILLAMIL SOUBLE": "PAMPAWAGEN SANTA ROSA", "980 NAVARRO RAFAEL": "PAMPAWAGEN SANTA ROSA",
+        "912 NICOLAS MARCHIORI": "FORTECAR SAN NICOLAS", "467 FABIAN LOSCERTALES": "PAMPAWAGEN GENERAL PICO",
+        "45 LAURA CASSANITI": "FORTECAR JUNIN", "1051 MARTIN GALOTTI": "FORTECAR OLAVARRIA",
+        "784 GUSTAVO RIVAS": "GRANVILLE TRELEW", "899 ELIAS LANGONE": "FORTECAR TRENQUE LAUQUEN",
+        "897 CONSTANZA NATTINO": "PAMPAWAGEN GENERAL PICO", "930 NICOLAS SCHNEIDER": "PAMPAWAGEN SANTA ROSA",
+        "962 GONZALO EZEQUIEL TORRES": "GRANVILLE COMODORO", "1089 ANGEL AUGUSTO FRANCO": "GRANVILLE TRELEW",
+        "1081 GASTON ACTIS": "PAMPAWAGEN SANTA ROSA", "596 MARINO JOAQUIN": "FORTECAR CHIVILCOY",
+        "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
+        "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
+        "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", "401 JOSE JUAN": "GRANVILLE JUNIN",
+        "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+        "913 NICOLAS MALDONADO": "GRANVILLE CITROEN SAN NICOLAS", "462 JORGE FERRAIUOLO": "FORTECAR JUNIN",
+        "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA", "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO",
+        "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN", "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN",
+        "1097 NICOLAS CIALDO": "FORTECAR CHIVILCOY", "16 DANILO ROBLEDO": "GRANVILLE PERGAMINO",
+        "1003 JUAN IGNACIO ARCE": "OPENCARS JUNIN", "1048 BRUNO VIGNALE": "OPENCARS JUNIN",
+        "961 FRANCO BRAVO": "FORTECAR OLAVARRIA", "751 SANTIAGO CARRERE": "GRANVILLE SAN NICOLAS",
+        "1047 GISELL LLANOS": "GRANVILLE COMODORO", "1088 FRANCO VEGA": "GRANVILLE PERGAMINO",
+        "402 CRISTIAN LOPEZ": "FORTECAR JUNIN", "1080 CRISTIAN ESCALANTE": "FORTECAR NUEVE DE JULIO",
+        "1021 JUAN ANDRES BRIZUELA": "GRANVILLE COMODORO", "458 OSCAR TAVANI": "GRANVILLE SAN NICOLAS",
+        "781 SILVANA CHAMINE": "GRANVILLE MADRYN", "1109 JULIETA DOWNES": "FORTECAR SAN NICOLAS",
+        "476 POLIZZI PABLO ANDRES": "FORTECAR PERGAMINO", "950 SOFIA DIAMELA FERNANDEZ": "GRANVILLE JUNIN",
+        "1099 GASTON SENOSEAIN": "PAMPAWAGEN SANTA ROSA", "1108 FLORENCIA HAESLER": "FORTECAR SAN NICOLAS",
+        "968 RODRIGO JULIAN RIOS": "GRANVILLE MADRYN", "974 CIELO QUIROGA": "OPENCARS SAN NICOLAS",
+        "786 RICHARD FORMANTEL ALBORNOZ": "GRANVILLE COMODORO", "601 SOSA JUAN CARLOS": "FORTECAR CHIVILCOY",
+        "1104 CELIA FABIANA GONZALEZ": "GRANVILLE CITROEN SAN NICOLAS", "1050 MANUEL SORAIZ": "FORTECAR OLAVARRIA",
+        "1100 CAMPODONICO MAGALI": "FORTECAR NUEVE DE JULIO", "1112 AGUSTINA AUZA": "GRANVILLE MADRYN",
+        "1111 DAMIAN PARRONDO": "GRANVILLE MADRYN", "1101 RODRIGO BACCHIARRI": "GRANVILLE TRELEW",
+        "SS SANTIAGO SERVIDIA": "GRANVILLE MADRYN", "41 TOMAS DI NUCCI": "FORTECAR JUNIN",
+        "414 CLAUDIO SANCHEZ": "RED SECUNDARIA", "986 RUBEN JORGE LARRIPA": "RED SECUNDARIA",
+        "1031 ADRIAN FERNANDO SANCHEZ": "RED SECUNDARIA", "G GERENCIA MARC AS": "GERENCIA",
+        "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
+        "1119 ROMAN GAVINO": "FORTECAR NUEVE DE JULIO", "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
+        "1118 BRENDA AGUIRRE": "FORTECAR OLAVARRIA",
+    }
 
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_fix")
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_fix")
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_final")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_final")
 
     if u45 and u53:
         try:
@@ -180,24 +214,85 @@ elif pagina == "Ranking de Asesores 🥇":
             df53_raw = leer_archivo(u53)
 
             def limpiar_texto(t):
-                if pd.isna(t): return ""
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
             # --- PROCESAMIENTO U45 ---
-            # Identificamos columnas por nombre para evitar errores de índice
-            col_asesor_std = df45_raw.columns[4]  # E
-            col_tipo = df45_raw.columns[17]      # R
-            col_vendedor_comp = "VENDEDOR COMPARTIDO" # BK
-            col_estad = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), None)
-            col_toma_vo = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
+            c_v_45 = df45_raw.columns[4]
+            c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
+            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
+            c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
-            # Filtro de seguridad (Sacamos Anulados y AC)
-            df45_clean = df45_raw[df45_raw[col_estad] != 'A'].copy()
-            df45_clean = df45_clean[df45_clean[col_tipo] != 'AC']
+            df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
+            df45['KEY'] = df45[c_v_45].apply(limpiar_texto)
 
-            # A. Ventas Asesores Estándar
-            df45_clean['KEY_STD'] = df45_clean[col_asesor_std].apply(limpiar_texto)
-            u45_std = df45_clean.groupby('KEY_STD').apply(lambda x: pd.Series({
-                'VN': int((x[col_tipo].isin(['O', 'OP'])).sum()),
-                'VO': int((x[col_tipo].isin(['O2','O2R'])).sum()),
-                'ADJ': int((x[col_tipo] == 'PL
+            u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
+                'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
+                'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
+                'ADJ': int((x[c_t_45] == 'PL').sum()),
+                'VE': int((x[c_t_45] == 'VE').sum()),
+                'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
+            })).reset_index()
+
+            # --- PROCESAMIENTO U53 ---
+            c_v_53 = df53_raw.columns[0]
+            df53 = df53_raw.copy()
+            df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
+            u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
+
+            # --- MERGE Y LÓGICA DE ORDENAMIENTO ---
+            ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
+            maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
+            ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
+            ranking = ranking.dropna(subset=['Sucursal']).copy()
+
+            for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']:
+                ranking[c] = ranking[c].astype(int)
+
+            ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
+
+            # Prioridad: RED SECUNDARIA va al final (prioridad 1), el resto al principio (prioridad 0)
+            ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
+            ranking = ranking.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
+
+            # --- VISUALIZACIÓN: PODIO ---
+            st.write("## 🎖️ Cuadro de Honor")
+            podio_cols = st.columns(3)
+            medallas = ["🥇", "🥈", "🥉"]
+            colores = ["#FFD700", "#C0C0C0", "#CD7F32"] # Oro, Plata, Bronce
+
+            for i in range(3):
+                if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
+                    asesor = ranking.iloc[i]
+                    with podio_cols[i]:
+                        st.markdown(f"""
+                        <div style="text-align: center; border: 2px solid {colores[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;">
+                            <h1 style="margin: 0;">{medallas[i]}</h1>
+                            <p style="font-weight: bold; margin: 5px 0;">{asesor['KEY']}</p>
+                            <h2 style="color: #1f77b4; margin: 0;">{asesor['TOTAL']} <small>u.</small></h2>
+                            <span style="font-size: 0.8em; color: gray;">{asesor['Sucursal']}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+            st.divider()
+
+            # --- TABLA DETALLADA ---
+            st.write("### 📊 Desglose de Ventas")
+            
+            # Generar iconos para la tabla
+            ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
+            
+            # Totales para el cierre de tabla
+            totales = pd.DataFrame({
+                'Rank': [''], 'KEY': ['TOTAL GENERAL'],
+                'VN': [ranking['VN'].sum()], 'VO': [ranking['VO'].sum()],
+                'PDA': [ranking['PDA'].sum()], 'ADJ': [ranking['ADJ'].sum()],
+                'VE': [ranking['VE'].sum()], 'TOTAL': [ranking['TOTAL'].sum()],
+                'TOMA_VO': [ranking['TOMA_VO'].sum()], 'Sucursal': ['']
+            })
+
+            final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
+            
+            st.dataframe(pd.concat([final_display, totales], ignore_index=True), use_container_width=True, hide_index=True)
+
+        except Exception as e:
+            st.error(f"Error en el procesamiento: {e}")
