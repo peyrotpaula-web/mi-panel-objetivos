@@ -154,13 +154,12 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# # =========================================================
 # OPCIÓN 2: RANKING CON PODIO VISUAL Y JERARQUÍA
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # 1. MAESTRO DE ASESORES ACTUALIZADO
+    # 1. MAESTRO ACTUALIZADO CON SUCURSAL VIRTUAL
     maestro_asesores = {
         "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
         "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -198,7 +197,7 @@ elif pagina == "Ranking de Asesores 🥇":
         "MARTIN POTREBICA": "FORTECAR NUEVE DE JULIO", "1116 MELINA BENITEZ": "FORTECAR NUEVE DE JULIO",
         "1119 ROMAN GAVINO": "FORTECAR NUEVE DE JULIO", "658 BRUNO GONZALEZ": "PAMPAWAGEN GENERAL PICO",
         "1118 BRENDA AGUIRRE": "FORTECAR OLAVARRIA",
-        # ASESORES VIRTUALES
+        # NUEVOS ASESORES VIRTUALES
         "FEDERICO RUBINO": "SUCURSAL VIRTUAL", "GERMAN CALVO": "SUCURSAL VIRTUAL",
         "JAZMIN BERAZATEGUI": "SUCURSAL VIRTUAL", "LUISANA LEDESMA": "SUCURSAL VIRTUAL",
         "CAMILA GARCIA": "SUCURSAL VIRTUAL", "CARLA VALLEJO": "SUCURSAL VIRTUAL",
@@ -244,7 +243,7 @@ elif pagina == "Ranking de Asesores 🥇":
             df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
 
-            # --- MERGE Y ORDENAMIENTO ---
+            # --- MERGE Y LÓGICA DE ORDENAMIENTO ---
             ranking = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
@@ -254,25 +253,23 @@ elif pagina == "Ranking de Asesores 🥇":
                 ranking[c] = ranking[c].astype(int)
 
             ranking['TOTAL'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
-            
-            # Prioridad para que Red Secundaria aparezca abajo
+
+            # Prioridad: RED SECUNDARIA va al final
             ranking['Prioridad'] = ranking['Sucursal'].apply(lambda x: 1 if x == "RED SECUNDARIA" else 0)
             ranking = ranking.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
-            
-            # Asignar Rango/Medalla
-            ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
 
             # --- VISUALIZACIÓN: PODIO ---
             st.write("## 🎖️ Cuadro de Honor")
             podio_cols = st.columns(3)
-            medallas, colores_podio = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
+            medallas = ["🥇", "🥈", "🥉"]
+            colores = ["#FFD700", "#C0C0C0", "#CD7F32"]
 
             for i in range(3):
                 if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
                     asesor = ranking.iloc[i]
                     with podio_cols[i]:
                         st.markdown(f"""
-                        <div style="text-align: center; border: 2px solid {colores_podio[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;">
+                        <div style="text-align: center; border: 2px solid {colores[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;">
                             <h1 style="margin: 0;">{medallas[i]}</h1>
                             <p style="font-weight: bold; margin: 5px 0;">{asesor['KEY']}</p>
                             <h2 style="color: #1f77b4; margin: 0;">{asesor['TOTAL']} <small>u.</small></h2>
@@ -282,46 +279,34 @@ elif pagina == "Ranking de Asesores 🥇":
 
             st.divider()
 
-            # --- TABLA DETALLADA ---
-            st.write("### 📊 Desglose de Ventas (Filtrable)")
+            # --- TABLA DETALLADA CON LÓGICA DE EXCLUSIÓN PARA TOTALES ---
+            st.write("### 📊 Desglose de Ventas")
             
-            # Preparar DF de visualización
-            display_df = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
+            # Generar el DataFrame para mostrar
+            ranking.insert(0, 'Rank', [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))])
             
-            # Lógica de colores por fila
-            def color_filas(row):
-                if row['Sucursal'] == "SUCURSAL VIRTUAL":
-                    return ['background-color: #D1E8FF; color: black'] * len(row) # Azul
-                elif row['Sucursal'] == "RED SECUNDARIA":
-                    return ['background-color: #E6E0F8; color: black'] * len(row) # Violeta
-                return [''] * len(row)
-
-            # Mostrar tabla interactiva (Streamlit habilita filtros automáticamente)
-            st.dataframe(
-                display_df.style.apply(color_filas, axis=1),
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # --- FILA DE TOTALES EXCLUYENTES ---
+            # FILTRO CRÍTICO: Solo sumamos lo que NO es SUCURSAL VIRTUAL ni RED SECUNDARIA (opcional)
+            # Aquí sumamos todo excepto Virtual según tu pedido
             df_para_totales = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
-            row_total = pd.DataFrame({
-                'Métrica': ['TOTAL OPERATIVO (Excl. Virtual)'],
-                'VN': [df_para_totales['VN'].sum()], 'VO': [df_para_totales['VO'].sum()],
-                'PDA': [df_para_totales['PDA'].sum()], 'ADJ': [df_para_totales['ADJ'].sum()],
-                'VE': [df_para_totales['VE'].sum()], 'TOTAL': [df_para_totales['TOTAL'].sum()],
-                'TOMA_VO': [df_para_totales['TOMA_VO'].sum()]
+
+            totales = pd.DataFrame({
+                'Rank': [''], 'KEY': ['TOTAL OPERATIVO (Excl. Virtual)'],
+                'VN': [df_para_totales['VN'].sum()], 
+                'VO': [df_para_totales['VO'].sum()],
+                'PDA': [df_para_totales['PDA'].sum()], 
+                'ADJ': [df_para_totales['ADJ'].sum()],
+                'VE': [df_para_totales['VE'].sum()], 
+                'TOTAL': [df_para_totales['TOTAL'].sum()],
+                'TOMA_VO': [df_para_totales['TOMA_VO'].sum()], 
+                'Sucursal': ['']
             })
 
-            st.table(row_total.set_index('Métrica'))
-
-            # Leyenda de colores
-            st.markdown("""
-            <div style="display: flex; gap: 20px; font-size: 0.85em; margin-top: 10px;">
-                <span style="background-color: #D1E8FF; padding: 4px 10px; border-radius: 5px; color: black; border: 1px solid #A5C8ED;">🟦 <b>Sucursal Virtual</b></span>
-                <span style="background-color: #E6E0F8; padding: 4px 10px; border-radius: 5px; color: black; border: 1px solid #CDC4ED;">🟪 <b>Red Secundaria</b></span>
-            </div>
-            """, unsafe_allow_html=True)
+            final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
+            
+            # Unimos la tabla de asesores con la fila de totales calculada
+            st.dataframe(pd.concat([final_display, totales], ignore_index=True), use_container_width=True, hide_index=True)
+            
+            st.info("💡 Nota: El 'TOTAL OPERATIVO' en la parte inferior excluye las unidades de la Sucursal Virtual para no duplicar objetivos de facturación.")
 
         except Exception as e:
             st.error(f"Error en el procesamiento: {e}")
