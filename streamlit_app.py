@@ -154,24 +154,21 @@ if pagina == "Panel de Objetivos Sucursales":
             st.error(f"Error al procesar: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING CON ASESORES VIRTUALES (SIN SUMAR TOTAL)
+# OPCIÓN 2: RANKING DE ASESORES (VERSIÓN ROBUSTA CON VIRTUALES)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     
-    # 1. Lista de Asesores Virtuales para validación
+    # 1. Definición de Virtuales
     asesores_virtuales = [
         "FEDERICO RUBINO", "GERMAN CALVO", "JAZMIN BERAZATEGUI", 
         "LUISANA LEDESMA", "CAMILA GARCIA", "CARLA VALLEJO", 
         "PILAR ALCOBA", "ROCIO FERNANDEZ"
     ]
 
-    # Maestro extendido (incluimos los virtuales para que el mapeo de sucursal funcione)
-    maestro_asesores.update({v: "SUCURSAL VIRTUAL" for v in asesores_virtuales})
-
     c1, c2 = st.columns(2)
-    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_v3")
-    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_v3")
+    with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_fix")
+    with c2: u53 = st.file_uploader("Archivo U53", type=["xlsx", "xls", "csv"], key="u53_fix")
 
     if u45 and u53:
         try:
@@ -183,136 +180,24 @@ elif pagina == "Ranking de Asesores 🥇":
             df53_raw = leer_archivo(u53)
 
             def limpiar_texto(t):
+                if pd.isna(t): return ""
                 return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-            # --- A. PROCESAMIENTO ASESORES ESTÁNDAR ---
-            c_v_45 = df45_raw.columns[4] # Columna E (Asesor estándar)
-            c_t_45 = df45_raw.columns[17] # Columna R (Tipo)
-            c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
-            c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
-            
-            df45_std = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
-            df45_std['KEY'] = df45_std[c_v_45].apply(limpiar_texto)
-            
-            u45_std_sum = df45_std.groupby('KEY').apply(lambda x: pd.Series({
-                'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
-                'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
-                'ADJ': int((x[c_t_45] == 'PL').sum()),
-                'VE': int((x[c_t_45] == 'VE').sum()),
-                'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
-            })).reset_index()
+            # --- PROCESAMIENTO U45 ---
+            # Identificamos columnas por nombre para evitar errores de índice
+            col_asesor_std = df45_raw.columns[4]  # E
+            col_tipo = df45_raw.columns[17]      # R
+            col_vendedor_comp = "VENDEDOR COMPARTIDO" # BK
+            col_estad = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), None)
+            col_toma_vo = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
 
-            # --- B. NUEVA PARTE: PROCESAMIENTO ASESORES VIRTUALES ---
-            # En U45 buscar en Columna BK (Vendedor Compartido - índice 62 aprox, mejor por nombre)
-            c_compartido = df45_raw.columns[62] # Columna BK
-            
-            df45_virt = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
-            df45_virt['KEY'] = df45_virt[c_compartido].apply(limpiar_texto)
-            # Filtrar solo si el nombre está en nuestra lista de virtuales
-            df45_virt = df45_virt[df45_virt['KEY'].isin(asesores_virtuales)]
+            # Filtro de seguridad (Sacamos Anulados y AC)
+            df45_clean = df45_raw[df45_raw[col_estad] != 'A'].copy()
+            df45_clean = df45_clean[df45_clean[col_tipo] != 'AC']
 
-            u45_virt_sum = df45_virt.groupby('KEY').apply(lambda x: pd.Series({
-                'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()),
-                'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
-                'ADJ': int((x[c_t_45] == 'PL').sum()),
-                'VE': int((x[c_t_45] == 'VE').sum()),
-                'TOMA_VO': 0 # Virtuales no suelen tomar usados según consigna
-            })).reset_index()
-
-            # En U53 buscar en Columna D (Origen - índice 3)
-            c_origen_53 = df53_raw.columns[3]
-            df53_all = df53_raw.copy()
-            
-            # PDA Estándar (Columna A)
-            df53_all['KEY_STD'] = df53_all[df53_raw.columns[0]].apply(limpiar_texto)
-            u53_std = df53_all.groupby('KEY_STD').size().reset_index(name='PDA')
-            u53_std.rename(columns={'KEY_STD': 'KEY'}, inplace=True)
-
-            # PDA Virtuales (Columna D)
-            df53_all['KEY_VIRT'] = df53_all[c_origen_53].apply(limpiar_texto)
-            u53_virt = df53_all[df53_all['KEY_VIRT'].isin(asesores_virtuales)].groupby('KEY_VIRT').size().reset_index(name='PDA')
-            u53_virt.rename(columns={'KEY_VIRT': 'KEY'}, inplace=True)
-
-            # --- C. UNIFICACIÓN ---
-            # Combinamos std y virtuales (evitando duplicados de nombres si un virtual apareciera en columna E)
-            df_final_std = pd.merge(u45_std_sum, u53_std, on='KEY', how='outer').fillna(0)
-            df_final_virt = pd.merge(u45_virt_sum, u53_virt, on='KEY', how='outer').fillna(0)
-            
-            # Marcamos quién es quién antes de concatenar
-            df_final_std['Es_Virtual'] = False
-            df_final_virt['Es_Virtual'] = True
-            
-            ranking = pd.concat([df_final_std, df_final_virt], ignore_index=True)
-            
-            # Mapeo de sucursal
-            maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
-            ranking['Sucursal'] = ranking['KEY'].map(maestro_limpio)
-            ranking = ranking.dropna(subset=['Sucursal']).copy()
-
-            # --- D. LÓGICA DE TOTALES Y PRIORIDADES ---
-            for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']:
-                ranking[c] = ranking[c].astype(int)
-
-            # IMPORTANTE: El total solo suma si NO es virtual
-            ranking['TOTAL'] = ranking.apply(
-                lambda x: (x['VN'] + x['VO'] + x['ADJ'] + x['VE'] + x['PDA']) if not x['Es_Virtual'] else 0, 
-                axis=1
-            )
-            
-            # Para que los virtuales no queden con "0" absoluto en la tabla, creamos una visual de total
-            ranking['Total_Visible'] = ranking['VN'] + ranking['VO'] + ranking['ADJ'] + ranking['VE'] + ranking['PDA']
-
-            # Prioridades de orden: 0: Estándar, 1: Virtual, 2: Red Secundaria
-            def asignar_prioridad(row):
-                if row['Sucursal'] == "RED SECUNDARIA": return 2
-                if row['Es_Virtual']: return 1
-                return 0
-
-            ranking['Prioridad'] = ranking.apply(asignar_prioridad, axis=1)
-            
-            # Ordenamos: Prioridad asc, y luego por Total Real (o Visible para virtuales)
-            ranking = ranking.sort_values(
-                by=['Prioridad', 'TOTAL', 'Total_Visible', 'TOMA_VO'], 
-                ascending=[True, False, False, False]
-            ).reset_index(drop=True)
-
-            # --- E. VISUALIZACIÓN ---
-            # Podio (solo para presenciales)
-            st.write("## 🎖️ Cuadro de Honor")
-            podio_cols = st.columns(3)
-            for i in range(3):
-                if i < len(ranking) and ranking.iloc[i]['Prioridad'] == 0:
-                    asesor = ranking.iloc[i]
-                    with podio_cols[i]:
-                        st.metric(label=f"{i+1}° - {asesor['KEY']}", value=f"{asesor['TOTAL']} u.", help=asesor['Sucursal'])
-
-            st.divider()
-
-            # Tabla Final
-            icons = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))]
-            ranking.insert(0, 'Rank', icons)
-
-            # Fila de Totales Generales
-            # Aquí sumamos solo lo que tiene 'TOTAL' > 0 (los presenciales)
-            totales = pd.DataFrame({
-                'Rank': [''], 'KEY': ['TOTAL GENERAL'],
-                'VN': [ranking['VN'].sum()], 'VO': [ranking['VO'].sum()],
-                'PDA': [ranking['PDA'].sum()], 'ADJ': [ranking['ADJ'].sum()],
-                'VE': [ranking['VE'].sum()], 'TOTAL': [ranking['TOTAL'].sum()],
-                'TOMA_VO': [ranking['TOMA_VO'].sum()], 'Sucursal': ['']
-            })
-
-            # Preparamos tabla para mostrar (usamos Total_Visible para que se vea cuánto vendió el virtual)
-            ranking_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'Total_Visible', 'TOMA_VO', 'Sucursal']].rename(
-                columns={'KEY': 'Asesor', 'Total_Visible': 'Unidades'}
-            )
-            
-            # Ajustamos el nombre de la columna en totales para que coincida en el concat
-            totales_display = totales.rename(columns={'TOTAL': 'Unidades'})
-
-            st.write("### 📊 Ranking Comercial Detallado")
-            st.info("Nota: Los asesores de 'SUCURSAL VIRTUAL' se muestran en el ranking pero sus unidades no se contabilizan en el Total General.")
-            st.dataframe(pd.concat([ranking_display, totales_display], ignore_index=True), use_container_width=True, hide_index=True)
-
-        except Exception as e:
-            st.error(f"Error detallado: {e}")
+            # A. Ventas Asesores Estándar
+            df45_clean['KEY_STD'] = df45_clean[col_asesor_std].apply(limpiar_texto)
+            u45_std = df45_clean.groupby('KEY_STD').apply(lambda x: pd.Series({
+                'VN': int((x[col_tipo].isin(['O', 'OP'])).sum()),
+                'VO': int((x[col_tipo].isin(['O2','O2R'])).sum()),
+                'ADJ': int((x[col_tipo] == 'PL
