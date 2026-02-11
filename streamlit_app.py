@@ -180,7 +180,7 @@ elif pagina == "Ranking de Asesores 🥇":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (SINCRO, NEGRILLAS Y SEMÁFORO)
+# OPCIÓN 3: CUMPLIMIENTO (LÓGICA DE TOTALES CORREGIDA)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -195,57 +195,67 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             df_m = pd.read_excel(f_meta)
             df_m.columns = [str(c).strip() for c in df_m.columns]
             cols = df_m.columns
-            df_m[cols[3]] = 0 # Logrado
+            df_m[cols[3]] = 0 # Columna 'Logrado'
             
-            # 1. Sincronización con Memoria
+            # 1. Sincronización de ventas desde memoria
             for idx, row in df_m.iterrows():
                 suc_ex = str(row[cols[0]]).upper()
                 if "TOTAL" in suc_ex: continue
                 for s_mem, val in ventas_reales.items():
-                    if s_mem.upper() in suc_ex: df_m.at[idx, cols[3]] = val
+                    if s_mem.upper() in suc_ex: 
+                        df_m.at[idx, cols[3]] = val
 
-            # 2. Cálculo de Totales
-            indices_tot = df_m[df_m[cols[0]].str.contains("TOTAL", na=False, case=False)].index
-            inicio = 0
-            for fin in indices_tot:
-                df_m.at[fin, cols[3]] = df_m.iloc[inicio:fin, 3].sum()
-                inicio = fin + 1
+            # 2. Cálculo de Subtotales por Marca (Ej: TOTAL OPENCARS)
+            marcas_principales = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR"]
             
-            # 3. Conversión de tipos y creación de columnas de %
+            inicio = 0
+            for idx, row in df_m.iterrows():
+                nombre_fila = str(row[cols[0]]).upper()
+                if "TOTAL" in nombre_fila and any(m in nombre_fila for m in marcas_principales):
+                    # Suma lo acumulado desde el último total hasta aquí
+                    df_m.at[idx, cols[3]] = df_m.iloc[inicio:idx, 3].sum()
+                    inicio = idx + 1 # Reinicia el puntero para la siguiente marca
+
+            # 3. Cálculo del TOTAL GENERAL (Suma de los Subtotales de las 4 marcas)
+            idx_total_general = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", na=False, case=False)].index
+            if not idx_total_general.empty:
+                # Sumamos solo las filas que son totales de marca para evitar duplicar
+                suma_gran_total = df_m[
+                    (df_m[cols[0]].str.contains("TOTAL", case=False)) & 
+                    (df_m[cols[0]].str.contains("|".join(marcas_principales), case=False))
+                ][cols[3]].sum()
+                
+                df_m.at[idx_total_general[0], cols[3]] = suma_gran_total
+
+            # 4. Limpieza y Porcentajes
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
             
-            col_pct_n1 = "% N1"
-            col_pct_n2 = "% N2"
+            col_pct_n1, col_pct_n2 = "% N1", "% N2"
             df_m[col_pct_n1] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             df_m[col_pct_n2] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
 
-            # --- FUNCIONES DE ESTILO ---
+            # --- ESTILOS ---
             def resaltar_totales(row):
                 if "TOTAL" in str(row[cols[0]]).upper():
                     return ['font-weight: bold; background-color: #f0f2f6'] * len(row)
                 return [''] * len(row)
 
             def semaforo_cumplimiento(val):
-                if val >= 1.0: color = '#28a745'     # Verde (100%+)
-                elif val >= 0.8: color = '#fd7e14'   # Naranja (80% - 99.9%)
-                else: color = '#dc3545'              # Rojo (<80%)
+                if val >= 1.0: color = '#28a745'
+                elif val >= 0.8: color = '#fd7e14'
+                else: color = '#dc3545'
                 return f'color: white; background-color: {color}; font-weight: bold; text-align: center'
 
-            # --- APLICACIÓN DE ESTILOS ---
             st.write("### ✅ Resumen de Cumplimiento")
-            
             df_final = df_m[[cols[0], cols[1], cols[2], cols[3], col_pct_n1, col_pct_n2]]
             
             estilo_df = df_final.style.apply(resaltar_totales, axis=1) \
                 .map(semaforo_cumplimiento, subset=[col_pct_n1, col_pct_n2]) \
                 .format({
-                    cols[1]: "{:,.0f}",
-                    cols[2]: "{:,.0f}",
-                    cols[3]: "{:,.0f}",
-                    col_pct_n1: "{:.1%}",
-                    col_pct_n2: "{:.1%}"
+                    cols[1]: "{:,.0f}", cols[2]: "{:,.0f}", cols[3]: "{:,.0f}",
+                    col_pct_n1: "{:.1%}", col_pct_n2: "{:.1%}"
                 })
 
             st.dataframe(estilo_df, use_container_width=True, hide_index=True)
