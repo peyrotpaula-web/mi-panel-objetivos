@@ -73,20 +73,34 @@ if pag == "Ranking de Asesores 🥇":
             c_ase = d45.columns[4]; c_tip = next(c for c in d45.columns if "TIPO" in str(c).upper())
             c_est = next(c for c in d45.columns if "ESTAD" in str(c).upper())
             c_tom = next((c for c in d45.columns if "TAS. VO" in str(c).upper()), None)
+            
+            # Filtro de Estado: Mantenemos excluir 'A' (Anulados)
             df45 = d45[(d45[c_est] != "A") & (d45[c_tip] != "AC")].copy()
             df45["KEY"] = df45[c_ase].apply(limpiar_texto)
-            res = df45.groupby("KEY").apply(lambda x: pd.Series({
-                "VN": int(x[c_tip].isin(["O", "OP"]).sum()), "VO": int(x[c_tip].isin(["O2","O2R"]).sum()),
-                "ADJ": int((x[c_tip] == "PL").sum()), "VE": int((x[c_tip] == "VE").sum()),
-                "TOMA": int(x[c_tom].apply(lambda v: 1 if str(v).strip() not in ["0", "0.0", "nan", "None", "", "0,0"] else 0).sum()) if c_tom else 0
-            })).reset_index()
+            
+            def contar_ventas(x):
+                # VN: O, OP
+                vn = x[c_tip].isin(["O", "OP"]).sum()
+                # VO: Ajustado para que tome CUALQUIER O2 (O2, O2R, O2 P, etc)
+                vo = x[c_tip].astype(str).str.upper().str.startswith("O2").sum()
+                adj = (x[c_tip] == "PL").sum()
+                ve = (x[c_tip] == "VE").sum()
+                toma = 0
+                if c_tom:
+                    toma = x[c_tom].apply(lambda v: 1 if str(v).strip() not in ["0", "0.0", "nan", "None", "", "0,0"] else 0).sum()
+                return pd.Series({"VN": int(vn), "VO": int(vo), "ADJ": int(adj), "VE": int(ve), "TOMA": int(toma)})
+
+            res = df45.groupby("KEY").apply(contar_ventas).reset_index()
+            
             d53["KEY"] = d53[d53.columns[0]].apply(limpiar_texto)
             pda = d53.groupby("KEY").size().reset_index(name="PDA")
             df = pd.merge(res, pda, on="KEY", how="outer").fillna(0)
+            
             ml = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             df["Sucursal"] = df["KEY"].map(ml); df = df.dropna(subset=["Sucursal"]).copy()
             for c in ["VN", "VO", "PDA", "ADJ", "VE", "TOMA"]: df[c] = df[c].astype(int)
             df["TOTAL"] = df["VN"] + df["VO"] + df["ADJ"] + df["VE"] + df["PDA"]
+            
             st.session_state["v_mem"] = df.groupby("Sucursal")["TOTAL"].sum().to_dict()
             
             def prio(s):
@@ -94,6 +108,7 @@ if pag == "Ranking de Asesores 🥇":
                 return 1 if s == "RED SECUNDARIA" else 0
             df["P"] = df["Sucursal"].apply(prio); df = df.sort_values(by=["P", "TOTAL", "TOMA"], ascending=[True, False, False]).reset_index(drop=True)
             
+            # Cuadro de Honor
             st.write("### 🎖️ Cuadro de Honor")
             pc = st.columns(3)
             meds = ["🥇", "🥈", "🥉"]; cols_b = ["#FFD700", "#C0C0C0", "#CD7F32"]
@@ -121,6 +136,7 @@ if pag == "Ranking de Asesores 🥇":
                 return base
             st.dataframe(disp.style.apply(styler, axis=1), use_container_width=True, hide_index=True)
             
+            # Totales generales del Ranking
             df_c = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
             sumas = {"VN": int(df_c["VN"].sum()), "VO": int(df_c["VO"].sum()), "PDA": int(df_c["PDA"].sum()), "ADJ": int(df_c["ADJ"].sum()), "VE": int(df_c["VE"].sum()), "TOTAL": int(df_c["TOTAL"].sum()), "TOMA": int(df_c["TOMA"].sum())}
             st.markdown("---")
@@ -128,21 +144,21 @@ if pag == "Ranking de Asesores 🥇":
             with l: st.subheader("TOTAL GENERAL")
             with r: st.table(pd.DataFrame([sumas]).assign(Idx="").set_index("Idx"))
 
-            # BOTÓN DESCARGA CSV (RESTAURADO)
+            # Descarga
             t_csv = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
             df_csv = pd.concat([disp, pd.DataFrame([t_csv])])
             st.download_button("📥 Descargar CSV", df_csv.to_csv(index=False).encode('utf-8'), "ranking_asesores.csv", "text/csv")
             
         except Exception as e: st.error(f"Error: {e}")
 
-# --- CUMPLIMIENTO (LOGRADO Y SUMAS CORREGIDAS) ---
+# --- CUMPLIMIENTO ---
 elif pag == "Cumplimiento":
     st.title("🎯 Cumplimiento de Objetivos")
     obj_file = st.file_uploader("Subir Objetivos (Excel)", type=["xlsx"], key="obj_cump")
     
     if obj_file:
         if not st.session_state["v_mem"]:
-            st.warning("⚠️ Primero subí los archivos en 'Ranking de Asesores'.")
+            st.warning("⚠️ Primero cargá el Ranking para obtener las ventas logradas.")
         else:
             try:
                 df_raw = pd.read_excel(obj_file)
@@ -171,15 +187,13 @@ elif pag == "Cumplimiento":
                 df_base = pd.DataFrame(data_list)
                 final_rows = []
                 marcas = ["FORTECAR", "GRANVILLE", "PAMPAWAGEN", "OPENCARS", "RED SECUNDARIA"]
-                
-                total_gen_n1 = 0; total_gen_n2 = 0; total_gen_log = 0
+                total_gen_n1 = total_gen_n2 = total_gen_log = 0
 
                 for m in marcas:
                     sub_df = df_base[df_base["Marca"] == m]
                     if sub_df.empty: continue
                     for _, r in sub_df.iterrows(): final_rows.append(r.to_dict())
                     
-                    # Sumatoria de Logrado incluida
                     s_n1 = sub_df["Nivel 1"].sum()
                     s_n2 = sub_df["Nivel 2"].sum()
                     s_log = sub_df["Logrado"].sum()
@@ -196,21 +210,19 @@ elif pag == "Cumplimiento":
                 })
 
                 df_final = pd.DataFrame(final_rows)
-                df_final["% Nivel 1"] = (df_final["Logrado"] / df_final["Nivel 1"] * 100).fillna(0)
-                df_final["% Nivel 2"] = (df_final["Logrado"] / df_final["Nivel 2"] * 100).fillna(0)
+                df_final["% Nivel 1"] = (df_final["Logrado"] / df_final["Nivel 1"] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+                df_final["% Nivel 2"] = (df_final["Logrado"] / df_final["Nivel 2"] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
                 df_final["Faltan N1"] = (df_final["Nivel 1"] - df_final["Logrado"]).clip(lower=0)
                 df_final["Faltan N2"] = (df_final["Nivel 2"] - df_final["Logrado"]).clip(lower=0)
 
                 def style_custom(row):
                     styles = [''] * len(row)
-                    # Semaforización SOLO en porcentajes
                     for col in ["% Nivel 1", "% Nivel 2"]:
                         idx = df_final.columns.get_loc(col)
                         val = row[col]
                         if val < 80: styles[idx] = 'color: red;'
                         elif val < 100: styles[idx] = 'color: orange;'
                         else: styles[idx] = 'color: green;'
-                    # Resalte de filas de Total
                     if row.get("IsTotal", False):
                         return ['background-color: #f0f2f6; font-weight: bold;' + s for s in styles]
                     return styles
