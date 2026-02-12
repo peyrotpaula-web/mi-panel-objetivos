@@ -57,11 +57,12 @@ if "v_mem" not in st.session_state:
 
 pag = st.sidebar.radio("Navegación", ["Panel de Objetivos", "Ranking de Asesores 🥇", "Cumplimiento"])
 
+# --- SECCIÓN RANKING ---
 if pag == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores")
     c1, c2 = st.columns(2)
-    u45 = c1.file_uploader("Subir U45", type=["xlsx", "xls", "csv"])
-    u53 = c2.file_uploader("Subir U53", type=["xlsx", "xls", "csv"])
+    u45 = c1.file_uploader("Subir U45", type=["xlsx", "xls", "csv"], key="u45_rank")
+    u53 = c2.file_uploader("Subir U53", type=["xlsx", "xls", "csv"], key="u53_rank")
 
     if u45 and u53:
         try:
@@ -100,7 +101,6 @@ if pag == "Ranking de Asesores 🥇":
             df["P"] = df["Sucursal"].apply(prio)
             df = df.sort_values(by=["P", "TOTAL", "TOMA"], ascending=[True, False, False]).reset_index(drop=True)
 
-            # Cuadro de Honor
             st.write("### 🎖️ Cuadro de Honor")
             pc = st.columns(3)
             meds = ["🥇", "🥈", "🥉"]; cols_b = ["#FFD700", "#C0C0C0", "#CD7F32"]
@@ -121,7 +121,6 @@ if pag == "Ranking de Asesores 🥇":
             if f_suc: rf = rf[rf["Sucursal"].isin(f_suc)]
             if f_ase: rf = rf[rf["KEY"].str.contains(f_ase.upper())]
 
-            # Tabla Asesores
             rf["Rank"] = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(rf))]
             disp = rf[["Rank", "KEY", "VN", "VO", "PDA", "ADJ", "VE", "TOTAL", "TOMA", "Sucursal"]].rename(columns={"KEY":"Asesor"})
             
@@ -133,7 +132,6 @@ if pag == "Ranking de Asesores 🥇":
 
             st.dataframe(disp.style.apply(styler, axis=1), use_container_width=True, hide_index=True)
 
-            # TOTAL GENERAL SIN COLUMNA VACÍA
             df_c = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
             sumas = {
                 "VN": int(df_c["VN"].sum()), "VO": int(df_c["VO"].sum()), "PDA": int(df_c["PDA"].sum()),
@@ -145,17 +143,54 @@ if pag == "Ranking de Asesores 🥇":
             l, r = st.columns([1.5, 5])
             with l: st.subheader("TOTAL GENERAL")
             with r:
-                # Quitamos el índice asignando una cadena vacía y usándola de índice
                 st.table(pd.DataFrame([sumas]).assign(Idx="").set_index("Idx"))
 
-            # Botón Descarga
             t_d = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
             df_csv = pd.concat([disp, pd.DataFrame([t_d])])
             st.download_button("📥 Descargar CSV", df_csv.to_csv(index=False).encode('utf-8'), "ranking.csv", "text/csv")
 
         except Exception as e: st.error(f"Error: {e}")
 
+# --- SECCIÓN CUMPLIMIENTO (RESTAURADA) ---
+elif pag == "Cumplimiento":
+    st.title("🎯 Cumplimiento de Objetivos")
+    
+    col1, col2 = st.columns(2)
+    obj_file = col1.file_uploader("Subir Objetivos (Excel)", type=["xlsx"], key="obj_cump")
+    
+    if obj_file:
+        if not st.session_state["v_mem"]:
+            st.warning("⚠️ Primero debes subir los archivos U45/U53 en la sección 'Ranking' para calcular las ventas actuales.")
+        else:
+            try:
+                df_obj = pd.read_excel(obj_file)
+                df_obj["Sucursal"] = df_obj[df_obj.columns[0]].apply(limpiar_texto)
+                
+                ventas_actuales = st.session_state["v_mem"]
+                
+                resultados = []
+                for _, row in df_obj.iterrows():
+                    suc = row["Sucursal"]
+                    objetivo = row[df_obj.columns[1]]
+                    logrado = ventas_actuales.get(suc, 0)
+                    
+                    cumplimiento = (logrado / objetivo) * 100 if objetivo > 0 else 0
+                    falta = max(0, objetivo - logrado)
+                    
+                    resultados.append({
+                        "Sucursal": suc,
+                        "Objetivo": objetivo,
+                        "Logrado": logrado,
+                        "Faltan": falta,
+                        "% Cumplimiento": f"{cumplimiento:.1f}%"
+                    })
+                
+                df_final = pd.DataFrame(resultados)
+                st.dataframe(df_final, use_container_width=True, hide_index=True)
+                
+            except Exception as e:
+                st.error(f"Error al procesar objetivos: {e}")
+
 elif pag == "Panel de Objetivos":
     st.title("📊 Panel de Objetivos")
-elif pag == "Cumplimiento":
-    st.title("🎯 Cumplimiento")
+    st.info("Sección en desarrollo.")
