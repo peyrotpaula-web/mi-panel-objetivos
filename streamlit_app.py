@@ -22,7 +22,7 @@ maestro_asesores = {
     "916 MATIAS NICOLAS JACCOUD": "FORTECAR PERGAMINO", "902 AGUSTINA BARRIOS": "FORTECAR OLAVARRIA",
     "1091 NORBERTO ALESSO": "FORTECAR PERGAMINO", "477 CARLOS MANFREDINI": "GRANVILLE SAN NICOLAS",
     "748 HERNAN MAXIMILIANO NOLASCO": "GRANVILLE PERGAMINO", "401 JOSE JUAN": "GRANVILLE JUNIN",
-    "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 CRISTIAN BRIGNANI": "FORTECAR CHIVILCOY",
+    "409 IGNACIO SOSA": "FORTECAR PERGAMINO", "774 ELIAS BRIGNANI": "FORTECAR CHIVILCOY",
     "913 NICOLAS MALDONADO": "GRANVILLE CITROEN SAN NICOLAS", "462 JORGE FERRAIUOLO": "FORTECAR JUNIN",
     "931 JUAN IGNACIO SORAIZ": "FORTECAR OLAVARRIA", "648 VALENTINA DIAZ REBICHINI": "PAMPAWAGEN GENERAL PICO",
     "977 OLIVIA ZUCARELLI": "OPENCARS JUNIN", "1004 JOSE LUIS CIARROCCHI": "FORTECAR JUNIN",
@@ -128,7 +128,7 @@ if pag == "Ranking de Asesores 🥇":
             with r: st.table(pd.DataFrame([sumas]).assign(Idx="").set_index("Idx"))
         except Exception as e: st.error(f"Error: {e}")
 
-# --- SECCIÓN CUMPLIMIENTO (RESTAURADA Y ROBUSTA) ---
+# --- SECCIÓN CUMPLIMIENTO (TÍTULOS LIMPIOS Y TOTALES POR MARCA) ---
 elif pag == "Cumplimiento":
     st.title("🎯 Cumplimiento de Objetivos")
     obj_file = st.file_uploader("Subir Objetivos (Excel)", type=["xlsx"], key="obj_cump")
@@ -139,47 +139,109 @@ elif pag == "Cumplimiento":
         else:
             try:
                 df_raw = pd.read_excel(obj_file)
-                # Tomamos solo las 3 primeras columnas sin importar el nombre original
                 df_obj = df_raw.iloc[:, :3].copy()
                 df_obj.columns = ["Sucursal", "Obj N1", "Obj N2"]
                 
                 ventas_actuales = st.session_state["v_mem"]
-                res_data = []
+                
+                # Función para identificar marca
+                def get_marca(suc):
+                    s = suc.upper()
+                    if "FORTECAR" in s: return "FORTECAR"
+                    if "GRANVILLE" in s: return "GRANVILLE"
+                    if "PAMPAWAGEN" in s: return "PAMPAWAGEN"
+                    if "OPENCARS" in s: return "OPENCARS"
+                    if "RED SECUNDARIA" in s: return "RED SECUNDARIA"
+                    return "OTRO"
 
+                data_list = []
                 for _, row in df_obj.iterrows():
                     suc_nombre = str(row["Sucursal"])
-                    suc_key = limpiar_texto(suc_nombre)
-                    obj1 = row["Obj N1"]
-                    obj2 = row["Obj N2"]
-                    logrado = ventas_actuales.get(suc_key, 0)
-                    
-                    cump1 = (logrado / obj1 * 100) if obj1 > 0 else 0
-                    cump2 = (logrado / obj2 * 100) if obj2 > 0 else 0
-                    
-                    res_data.append({
+                    logrado = ventas_actuales.get(limpiar_texto(suc_nombre), 0)
+                    data_list.append({
                         "Sucursal": suc_nombre,
-                        "Nivel 1": obj1,
-                        "Nivel 2": obj2,
-                        "Logrado": logrado,
-                        "% Nivel 1": cump1,
-                        "% Nivel 2": cump2,
-                        "Faltan N1": max(0, obj1 - logrado),
-                        "Faltan N2": max(0, obj2 - logrado)
+                        "Marca": get_marca(suc_nombre),
+                        "Nivel 1": row["Obj N1"],
+                        "Nivel 2": row["Obj N2"],
+                        "Logrado": logrado
                     })
                 
-                df_res = pd.DataFrame(res_data)
+                df_base = pd.DataFrame(data_list)
+                
+                # Cálculo de subtotales por marca
+                final_rows = []
+                marcas_orden = ["FORTECAR", "GRANVILLE", "PAMPAWAGEN", "OPENCARS", "RED SECUNDARIA"]
+                
+                total_gen_n1 = 0; total_gen_n2 = 0; total_gen_log = 0
 
-                def semaforo(val):
-                    if val < 80: return 'color: red;'
-                    elif 80 <= val < 100: return 'color: orange;'
-                    return 'color: green;'
+                for m in marcas_orden:
+                    sub_df = df_base[df_base["Marca"] == m]
+                    if sub_df.empty: continue
+                    
+                    # Agregar sucursales
+                    for _, r in sub_df.iterrows():
+                        final_rows.append(r.to_dict())
+                    
+                    # Agregar Fila Total Marca
+                    s_n1 = sub_df["Nivel 1"].sum()
+                    s_n2 = sub_df["Nivel 2"].sum()
+                    s_log = sub_df["Logrado"].sum()
+                    
+                    final_rows.append({
+                        "Sucursal": f"TOTAL {m}",
+                        "Marca": m,
+                        "Nivel 1": s_n1,
+                        "Nivel 2": s_n2,
+                        "Logrado": s_log,
+                        "IsTotal": True
+                    })
+                    
+                    # Acumular para el general
+                    total_gen_n1 += s_n1
+                    total_gen_n2 += s_n2
+                    total_gen_log += s_log
 
+                # Fila Total General
+                final_rows.append({
+                    "Sucursal": "TOTAL GENERAL",
+                    "Marca": "GLOBAL",
+                    "Nivel 1": total_gen_n1,
+                    "Nivel 2": total_gen_n2,
+                    "Logrado": total_gen_log,
+                    "IsTotal": True
+                })
+
+                df_final = pd.DataFrame(final_rows)
+                
+                # Cálculos de % y faltantes
+                df_final["% Nivel 1"] = (df_final["Logrado"] / df_final["Nivel 1"] * 100).fillna(0)
+                df_final["% Nivel 2"] = (df_final["Logrado"] / df_final["Nivel 2"] * 100).fillna(0)
+                df_final["Faltan N1"] = (df_final["Nivel 1"] - df_final["Logrado"]).clip(lower=0)
+                df_final["Faltan N2"] = (df_final["Nivel 2"] - df_final["Logrado"]).clip(lower=0)
+
+                def style_cumplimiento(row):
+                    styles = [''] * len(row)
+                    # Colores de semáforo
+                    for col in ["% Nivel 1", "% Nivel 2"]:
+                        val = row[col]
+                        idx = df_final.columns.get_loc(col)
+                        if val < 80: styles[idx] = 'color: red;'
+                        elif val < 100: styles[idx] = 'color: orange;'
+                        else: styles[idx] = 'color: green;'
+                    
+                    # Resaltado para filas de TOTAL
+                    if row.get("IsTotal", False):
+                        return ['background-color: #f0f2f6; font-weight: bold;' + s for s in styles]
+                    return styles
+
+                # Visualización
+                cols_mostrar = ["Sucursal", "Nivel 1", "Nivel 2", "Logrado", "% Nivel 1", "% Nivel 2", "Faltan N1", "Faltan N2"]
                 st.dataframe(
-                    df_res.style.format({
+                    df_final[cols_mostrar].style.format({
                         "% Nivel 1": "{:.1f}%", "% Nivel 2": "{:.1f}%",
                         "Nivel 1": "{:,.0f}", "Nivel 2": "{:,.0f}",
                         "Logrado": "{:,.0f}", "Faltan N1": "{:,.0f}", "Faltan N2": "{:,.0f}"
-                    }).applymap(semaforo, subset=["% Nivel 1", "% Nivel 2"]),
+                    }).apply(style_cumplimiento, axis=1),
                     use_container_width=True, hide_index=True
                 )
             except Exception as e:
