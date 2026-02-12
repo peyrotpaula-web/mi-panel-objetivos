@@ -1,13 +1,5 @@
-Entiendo perfectamente. El problema es que el componente st.table está agregando una columna de índice (un "0" a la izquierda) por defecto, lo que desplaza los valores y ensucia la visualización de la fila de totales.
-
-He ajustado el código para que en la visualización de TOTAL GENERAL no aparezca ese índice, logrando que la primera columna numérica sea directamente el valor de VN.
-
-Aquí tenés el bloque corregido (solo tenés que reemplazar el archivo completo para evitar errores de pegado):
-
-Python
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from io import BytesIO
 
 # Configuración inicial
@@ -65,7 +57,6 @@ if "v_mem" not in st.session_state:
 
 pag = st.sidebar.radio("Navegación", ["Panel de Objetivos", "Ranking de Asesores 🥇", "Cumplimiento"])
 
-# --- RANKING ---
 if pag == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores")
     c1, c2 = st.columns(2)
@@ -100,6 +91,7 @@ if pag == "Ranking de Asesores 🥇":
             df["Sucursal"] = df["KEY"].map(ml); df = df.dropna(subset=["Sucursal"]).copy()
             for c in ["VN", "VO", "PDA", "ADJ", "VE", "TOMA"]: df[c] = df[c].astype(int)
             df["TOTAL"] = df["VN"] + df["VO"] + df["ADJ"] + df["VE"] + df["PDA"]
+            
             st.session_state["v_mem"] = df.groupby("Sucursal")["TOTAL"].sum().to_dict()
 
             def prio(s):
@@ -108,7 +100,7 @@ if pag == "Ranking de Asesores 🥇":
             df["P"] = df["Sucursal"].apply(prio)
             df = df.sort_values(by=["P", "TOTAL", "TOMA"], ascending=[True, False, False]).reset_index(drop=True)
 
-            # Tarjetas Cuadradas
+            # Cuadro de Honor
             st.write("### 🎖️ Cuadro de Honor")
             pc = st.columns(3)
             meds = ["🥇", "🥈", "🥉"]; cols_b = ["#FFD700", "#C0C0C0", "#CD7F32"]
@@ -123,45 +115,43 @@ if pag == "Ranking de Asesores 🥇":
             st.divider()
             f1, f2 = st.columns(2)
             f_suc = f1.multiselect("Filtrar Sucursal:", sorted(df["Sucursal"].unique()))
-            f_ase = f2.text_input("Buscar Asesor por nombre:")
+            f_ase = f2.text_input("Buscar Asesor:")
             
             rf = df.copy()
             if f_suc: rf = rf[rf["Sucursal"].isin(f_suc)]
             if f_ase: rf = rf[rf["KEY"].str.contains(f_ase.upper())]
 
-            # Tabla con colores (sin negrita)
+            # Tabla Asesores
             rf["Rank"] = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(rf))]
             disp = rf[["Rank", "KEY", "VN", "VO", "PDA", "ADJ", "VE", "TOTAL", "TOMA", "Sucursal"]].rename(columns={"KEY":"Asesor"})
             
-            def styler_colores(row):
-                estilo = ['text-align: center'] * len(row)
-                if row["Sucursal"] == "SUCURSAL VIRTUAL": estilo = [x + "; color: #1a73e8;" for x in estilo]
-                elif row["Sucursal"] == "RED SECUNDARIA": estilo = [x + "; color: #8e44ad;" for x in estilo]
-                return estilo
+            def styler(row):
+                base = ['text-align: center'] * len(row)
+                if row["Sucursal"] == "SUCURSAL VIRTUAL": return [x + "; color: #1a73e8;" for x in base]
+                if row["Sucursal"] == "RED SECUNDARIA": return [x + "; color: #8e44ad;" for x in base]
+                return base
 
-            st.dataframe(disp.style.apply(styler_colores, axis=1), use_container_width=True, hide_index=True)
+            st.dataframe(disp.style.apply(styler, axis=1), use_container_width=True, hide_index=True)
 
-            # --- FILA TOTAL GENERAL MEJORADA ---
-            df_calculo = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
+            # TOTAL GENERAL SIN COLUMNA VACÍA
+            df_c = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
             sumas = {
-                "VN": int(df_calculo["VN"].sum()), "VO": int(df_calculo["VO"].sum()), "PDA": int(df_calculo["PDA"].sum()),
-                "ADJ": int(df_calculo["ADJ"].sum()), "VE": int(df_calculo["VE"].sum()), "TOTAL": int(df_calculo["TOTAL"].sum()),
-                "TOMA": int(df_calculo["TOMA"].sum())
+                "VN": int(df_c["VN"].sum()), "VO": int(df_c["VO"].sum()), "PDA": int(df_c["PDA"].sum()),
+                "ADJ": int(df_c["ADJ"].sum()), "VE": int(df_c["VE"].sum()), "TOTAL": int(df_c["TOTAL"].sum()),
+                "TOMA": int(df_c["TOMA"].sum())
             }
             
             st.markdown("---")
-            cl, cd = st.columns([1.5, 5])
-            with cl: 
-                st.subheader("TOTAL GENERAL")
-            with cd: 
-                # Creamos el DataFrame y usamos set_index en una columna ficticia para que no aparezca el "0"
-                df_tot_clean = pd.DataFrame([sumas])
-                st.table(df_tot_clean.assign(Index="").set_index("Index"))
+            l, r = st.columns([1.5, 5])
+            with l: st.subheader("TOTAL GENERAL")
+            with r:
+                # Quitamos el índice asignando una cadena vacía y usándola de índice
+                st.table(pd.DataFrame([sumas]).assign(Idx="").set_index("Idx"))
 
             # Botón Descarga
-            t_desc = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
-            df_desc = pd.concat([disp, pd.DataFrame([t_desc])])
-            st.download_button("📥 Descargar Ranking (CSV)", df_desc.to_csv(index=False).encode('utf-8'), "ranking.csv", "text/csv")
+            t_d = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
+            df_csv = pd.concat([disp, pd.DataFrame([t_d])])
+            st.download_button("📥 Descargar CSV", df_csv.to_csv(index=False).encode('utf-8'), "ranking.csv", "text/csv")
 
         except Exception as e: st.error(f"Error: {e}")
 
