@@ -1,14 +1,3 @@
-Entendido perfectamente. Vamos a realizar esos ajustes de precisión:
-
-Fuentes sin negrita: Los colores azul (Virtual) y violeta (Red Secundaria) se mantienen, pero con peso de fuente normal.
-
-Fila de Totales ultra-limpia: He modificado la visualización final para que sea una estructura simple: el texto "TOTAL GENERAL" seguido de los números sumados, eliminando por completo cualquier rastro de las columnas Rank, Asesor o Sucursal en esa fila.
-
-Tarjetas: Se mantienen con el diseño cuadrado y amplio para que los nombres no se corten.
-
-Aquí tenés el código actualizado:
-
-Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -20,7 +9,7 @@ st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
 def limpiar_texto(t):
     return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-# Maestro de Asesores
+# Maestro de Asesores completo
 maestro_asesores = {
     "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
     "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -69,20 +58,20 @@ if "v_mem" not in st.session_state:
 
 pag = st.sidebar.radio("Navegación", ["Panel de Objetivos", "Ranking de Asesores 🥇", "Cumplimiento"])
 
-# --- SECCIÓN RANKING ---
+# --- RANKING ---
 if pag == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores")
     c1, c2 = st.columns(2)
-    u45 = c1.file_uploader("U45", type=["xlsx", "xls", "csv"])
-    u53 = c2.file_uploader("U53", type=["xlsx", "xls", "csv"])
+    u45 = c1.file_uploader("Subir U45", type=["xlsx", "xls", "csv"])
+    u53 = c2.file_uploader("Subir U53", type=["xlsx", "xls", "csv"])
 
     if u45 and u53:
         try:
             def leer(f):
                 if f.name.endswith(".csv"): return pd.read_csv(f)
                 return pd.read_excel(f, engine="xlrd" if f.name.endswith(".xls") else None)
-            
             d45, d53 = leer(u45), leer(u53)
+            
             c_ase = d45.columns[4]; c_tip = next(c for c in d45.columns if "TIPO" in str(c).upper())
             c_est = next(c for c in d45.columns if "ESTAD" in str(c).upper())
             c_tom = next((c for c in d45.columns if "TAS. VO" in str(c).upper()), None)
@@ -102,7 +91,6 @@ if pag == "Ranking de Asesores 🥇":
             
             ml = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             df["Sucursal"] = df["KEY"].map(ml); df = df.dropna(subset=["Sucursal"]).copy()
-            
             for c in ["VN", "VO", "PDA", "ADJ", "VE", "TOMA"]: df[c] = df[c].astype(int)
             df["TOTAL"] = df["VN"] + df["VO"] + df["ADJ"] + df["VE"] + df["PDA"]
             st.session_state["v_mem"] = df.groupby("Sucursal")["TOTAL"].sum().to_dict()
@@ -113,14 +101,14 @@ if pag == "Ranking de Asesores 🥇":
             df["P"] = df["Sucursal"].apply(prio)
             df = df.sort_values(by=["P", "TOTAL", "TOMA"], ascending=[True, False, False]).reset_index(drop=True)
 
-            # TARJETAS CUADRADAS Y AMPLIAS
+            # Tarjetas Cuadradas
             st.write("### 🎖️ Cuadro de Honor")
             pc = st.columns(3)
             meds = ["🥇", "🥈", "🥉"]; cols_b = ["#FFD700", "#C0C0C0", "#CD7F32"]
             for i in range(min(3, len(df))):
                 a = df.iloc[i]
                 with pc[i]:
-                    st.markdown(f'''<div style="text-align:center;border:2px solid {cols_b[i]};border-radius:10px;padding:15px;background-color:#f8f9fa;min-height:160px;">
+                    st.markdown(f'''<div style="text-align:center;border:3px solid {cols_b[i]};border-radius:10px;padding:15px;background-color:#f8f9fa;min-height:160px;">
                         <h2 style="margin:0;">{meds[i]}</h2><b style="display:block;margin:10px 0;font-size:16px;">{a["KEY"]}</b>
                         <h1 style="color:#1f77b4;margin:0;">{a["TOTAL"]} <small style="font-size:15px;">unid.</small></h1>
                         <p style="color:gray;font-size:13px;margin-top:5px;">{a["Sucursal"]}</p></div>''', unsafe_allow_html=True)
@@ -134,59 +122,39 @@ if pag == "Ranking de Asesores 🥇":
             if f_suc: rf = rf[rf["Sucursal"].isin(f_suc)]
             if f_ase: rf = rf[rf["KEY"].str.contains(f_ase.upper())]
 
-            # TABLA DE ASESORES (Fuentes de colores sin negrita)
+            # Tabla con colores (sin negrita)
             rf["Rank"] = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(rf))]
             disp = rf[["Rank", "KEY", "VN", "VO", "PDA", "ADJ", "VE", "TOTAL", "TOMA", "Sucursal"]].rename(columns={"KEY":"Asesor"})
             
             def styler_colores(row):
                 estilo = ['text-align: center'] * len(row)
-                if row["Sucursal"] == "SUCURSAL VIRTUAL":
-                    estilo = [x + "; color: #1a73e8;" for x in estilo]
-                elif row["Sucursal"] == "RED SECUNDARIA":
-                    estilo = [x + "; color: #8e44ad;" for x in estilo]
+                if row["Sucursal"] == "SUCURSAL VIRTUAL": estilo = [x + "; color: #1a73e8;" for x in estilo]
+                elif row["Sucursal"] == "RED SECUNDARIA": estilo = [x + "; color: #8e44ad;" for x in estilo]
                 return estilo
 
             st.dataframe(disp.style.apply(styler_colores, axis=1), use_container_width=True, hide_index=True)
 
-            # FILA TOTAL GENERAL LIMPIA (Sin Rank, Asesor ni Sucursal)
+            # Fila TOTAL GENERAL Limpia
             df_calculo = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
-            
             sumas = {
-                "VN": df_calculo["VN"].sum(),
-                "VO": df_calculo["VO"].sum(),
-                "PDA": df_calculo["PDA"].sum(),
-                "ADJ": df_calculo["ADJ"].sum(),
-                "VE": df_calculo["VE"].sum(),
-                "TOTAL": df_calculo["TOTAL"].sum(),
-                "TOMA": df_calculo["TOMA"].sum()
+                "VN": int(df_calculo["VN"].sum()), "VO": int(df_calculo["VO"].sum()), "PDA": int(df_calculo["PDA"].sum()),
+                "ADJ": int(df_calculo["ADJ"].sum()), "VE": int(df_calculo["VE"].sum()), "TOTAL": int(df_calculo["TOTAL"].sum()),
+                "TOMA": int(df_calculo["TOMA"].sum())
             }
             
-            # Formateamos los datos para que el texto "TOTAL GENERAL" aparezca a la izquierda de los números
             st.markdown("---")
-            col_label, col_data = st.columns([1.5, 5])
-            with col_label:
-                st.subheader("TOTAL GENERAL")
-            with col_data:
-                # Mostramos una tabla con solo los números
-                df_tot_clean = pd.DataFrame([sumas])
-                st.table(df_tot_clean)
+            cl, cd = st.columns([1.5, 5])
+            with cl: st.subheader("TOTAL GENERAL")
+            with cd: st.table(pd.DataFrame([sumas]))
 
-            # Descarga con fila de totales integrada
-            t_data_descarga = {
-                "Rank": "---", "Asesor": "TOTAL GENERAL", 
-                "VN": sumas["VN"], "VO": sumas["VO"], "PDA": sumas["PDA"], 
-                "ADJ": sumas["ADJ"], "VE": sumas["VE"], "TOTAL": sumas["TOTAL"], 
-                "TOMA": sumas["TOMA"], "Sucursal": "---"
-            }
-            df_descarga = pd.concat([disp, pd.DataFrame([t_data_descarga])])
-            csv = df_descarga.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Ranking (CSV)", csv, "ranking_comercial.csv", "text/csv")
+            # Botón Descarga
+            t_desc = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
+            df_desc = pd.concat([disp, pd.DataFrame([t_desc])])
+            st.download_button("📥 Descargar Ranking (CSV)", df_desc.to_csv(index=False).encode('utf-8'), "ranking.csv", "text/csv")
 
-        except Exception as e: st.error(f"Error procesando archivos: {e}")
+        except Exception as e: st.error(f"Error: {e}")
 
 elif pag == "Panel de Objetivos":
     st.title("📊 Panel de Objetivos")
-    st.info("Subí el archivo de objetivos para visualizar datos.")
 elif pag == "Cumplimiento":
     st.title("🎯 Cumplimiento")
-    st.info("Esta sección utiliza los datos procesados en el Ranking.")
