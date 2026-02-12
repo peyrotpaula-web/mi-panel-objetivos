@@ -1,3 +1,14 @@
+Entendido perfectamente. Vamos a realizar esos ajustes de precisión:
+
+Fuentes sin negrita: Los colores azul (Virtual) y violeta (Red Secundaria) se mantienen, pero con peso de fuente normal.
+
+Fila de Totales ultra-limpia: He modificado la visualización final para que sea una estructura simple: el texto "TOTAL GENERAL" seguido de los números sumados, eliminando por completo cualquier rastro de las columnas Rank, Asesor o Sucursal en esa fila.
+
+Tarjetas: Se mantienen con el diseño cuadrado y amplio para que los nombres no se corten.
+
+Aquí tenés el código actualizado:
+
+Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -102,20 +113,19 @@ if pag == "Ranking de Asesores 🥇":
             df["P"] = df["Sucursal"].apply(prio)
             df = df.sort_values(by=["P", "TOTAL", "TOMA"], ascending=[True, False, False]).reset_index(drop=True)
 
-            # 1) TARJETAS CUADRADAS Y ANCHAS
+            # TARJETAS CUADRADAS Y AMPLIAS
             st.write("### 🎖️ Cuadro de Honor")
             pc = st.columns(3)
             meds = ["🥇", "🥈", "🥉"]; cols_b = ["#FFD700", "#C0C0C0", "#CD7F32"]
             for i in range(min(3, len(df))):
                 a = df.iloc[i]
                 with pc[i]:
-                    st.markdown(f'''<div style="text-align:center;border:3px solid {cols_b[i]};border-radius:10px;padding:15px;background-color:#f8f9fa;min-height:160px;">
+                    st.markdown(f'''<div style="text-align:center;border:2px solid {cols_b[i]};border-radius:10px;padding:15px;background-color:#f8f9fa;min-height:160px;">
                         <h2 style="margin:0;">{meds[i]}</h2><b style="display:block;margin:10px 0;font-size:16px;">{a["KEY"]}</b>
-                        <h1 style="color:#1f77b4;margin:0;">{a["TOTAL"]} <small style="font-size:15px;">unidades</small></h1>
+                        <h1 style="color:#1f77b4;margin:0;">{a["TOTAL"]} <small style="font-size:15px;">unid.</small></h1>
                         <p style="color:gray;font-size:13px;margin-top:5px;">{a["Sucursal"]}</p></div>''', unsafe_allow_html=True)
 
             st.divider()
-            # Filtros
             f1, f2 = st.columns(2)
             f_suc = f1.multiselect("Filtrar Sucursal:", sorted(df["Sucursal"].unique()))
             f_ase = f2.text_input("Buscar Asesor por nombre:")
@@ -124,44 +134,51 @@ if pag == "Ranking de Asesores 🥇":
             if f_suc: rf = rf[rf["Sucursal"].isin(f_suc)]
             if f_ase: rf = rf[rf["KEY"].str.contains(f_ase.upper())]
 
-            # 2) COLORES DE FUENTE EN TABLA
+            # TABLA DE ASESORES (Fuentes de colores sin negrita)
             rf["Rank"] = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(rf))]
             disp = rf[["Rank", "KEY", "VN", "VO", "PDA", "ADJ", "VE", "TOTAL", "TOMA", "Sucursal"]].rename(columns={"KEY":"Asesor"})
             
             def styler_colores(row):
                 estilo = ['text-align: center'] * len(row)
                 if row["Sucursal"] == "SUCURSAL VIRTUAL":
-                    estilo = [x + "; color: #1a73e8; font-weight: bold;" for x in estilo]
+                    estilo = [x + "; color: #1a73e8;" for x in estilo]
                 elif row["Sucursal"] == "RED SECUNDARIA":
-                    estilo = [x + "; color: #8e44ad; font-weight: bold;" for x in estilo]
+                    estilo = [x + "; color: #8e44ad;" for x in estilo]
                 return estilo
 
             st.dataframe(disp.style.apply(styler_colores, axis=1), use_container_width=True, hide_index=True)
 
-            # 3) FILA TOTAL GENERAL SIN CABECERAS DE TEXTO
+            # FILA TOTAL GENERAL LIMPIA (Sin Rank, Asesor ni Sucursal)
             df_calculo = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
-            t_data = {
-                "Rank": "", 
-                "Asesor": "", 
-                "VN": df_calculo["VN"].sum(), 
-                "VO": df_calculo["VO"].sum(), 
-                "PDA": df_calculo["PDA"].sum(), 
-                "ADJ": df_calculo["ADJ"].sum(), 
-                "VE": df_calculo["VE"].sum(), 
-                "TOTAL": df_calculo["TOTAL"].sum(), 
-                "TOMA": df_calculo["TOMA"].sum(), 
-                "Sucursal": ""
+            
+            sumas = {
+                "VN": df_calculo["VN"].sum(),
+                "VO": df_calculo["VO"].sum(),
+                "PDA": df_calculo["PDA"].sum(),
+                "ADJ": df_calculo["ADJ"].sum(),
+                "VE": df_calculo["VE"].sum(),
+                "TOTAL": df_calculo["TOTAL"].sum(),
+                "TOMA": df_calculo["TOMA"].sum()
             }
             
-            st.write("**TOTAL GENERAL**")
-            df_totales_vis = pd.DataFrame([t_data])
-            st.table(df_totales_vis.set_index("Rank"))
+            # Formateamos los datos para que el texto "TOTAL GENERAL" aparezca a la izquierda de los números
+            st.markdown("---")
+            col_label, col_data = st.columns([1.5, 5])
+            with col_label:
+                st.subheader("TOTAL GENERAL")
+            with col_data:
+                # Mostramos una tabla con solo los números
+                df_tot_clean = pd.DataFrame([sumas])
+                st.table(df_tot_clean)
 
-            # Descarga con fila de totales identificada para el Excel/CSV
-            t_data_descarga = t_data.copy()
-            t_data_descarga["Asesor"] = "TOTAL GENERAL"
+            # Descarga con fila de totales integrada
+            t_data_descarga = {
+                "Rank": "---", "Asesor": "TOTAL GENERAL", 
+                "VN": sumas["VN"], "VO": sumas["VO"], "PDA": sumas["PDA"], 
+                "ADJ": sumas["ADJ"], "VE": sumas["VE"], "TOTAL": sumas["TOTAL"], 
+                "TOMA": sumas["TOMA"], "Sucursal": "---"
+            }
             df_descarga = pd.concat([disp, pd.DataFrame([t_data_descarga])])
-            
             csv = df_descarga.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Descargar Ranking (CSV)", csv, "ranking_comercial.csv", "text/csv")
 
@@ -169,7 +186,7 @@ if pag == "Ranking de Asesores 🥇":
 
 elif pag == "Panel de Objetivos":
     st.title("📊 Panel de Objetivos")
-    st.info("Subí el archivo de objetivos en la barra lateral o aquí.")
+    st.info("Subí el archivo de objetivos para visualizar datos.")
 elif pag == "Cumplimiento":
     st.title("🎯 Cumplimiento")
     st.info("Esta sección utiliza los datos procesados en el Ranking.")
