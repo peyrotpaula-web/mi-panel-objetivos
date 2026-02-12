@@ -1,17 +1,3 @@
-Entendido. He tomado exactamente el código base que me pasaste y le he aplicado los ajustes específicos que solicitaste para que el comportamiento sea el esperado.
-
-Cambios realizados:
-Ranking: Se ajustó la lógica de ordenamiento para que GERENCIA aparezca siempre al final de todo (debajo de Red Secundaria).
-
-Descarga: Se añadió el botón para descargar el Ranking en formato CSV incluyendo la fila de totales generales.
-
-Semaforización en Cumplimiento: Ahora el color (Rojo, Naranja, Verde) se aplica solo al texto (fuente) y únicamente en las columnas de % N1 y % N2.
-
-Nuevas Columnas: Se agregaron las columnas "Faltante N1" y "Faltante N2" que calculan cuántas unidades restan para llegar al objetivo (si ya se superó, muestra 0).
-
-Aquí tienes el código actualizado:
-
-Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
