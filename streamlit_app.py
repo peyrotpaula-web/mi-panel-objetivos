@@ -1,3 +1,10 @@
+Entiendo perfectamente. El problema es que el componente st.table está agregando una columna de índice (un "0" a la izquierda) por defecto, lo que desplaza los valores y ensucia la visualización de la fila de totales.
+
+He ajustado el código para que en la visualización de TOTAL GENERAL no aparezca ese índice, logrando que la primera columna numérica sea directamente el valor de VN.
+
+Aquí tenés el bloque corregido (solo tenés que reemplazar el archivo completo para evitar errores de pegado):
+
+Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -134,7 +141,7 @@ if pag == "Ranking de Asesores 🥇":
 
             st.dataframe(disp.style.apply(styler_colores, axis=1), use_container_width=True, hide_index=True)
 
-            # Fila TOTAL GENERAL Limpia
+            # --- FILA TOTAL GENERAL MEJORADA ---
             df_calculo = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
             sumas = {
                 "VN": int(df_calculo["VN"].sum()), "VO": int(df_calculo["VO"].sum()), "PDA": int(df_calculo["PDA"].sum()),
@@ -144,8 +151,12 @@ if pag == "Ranking de Asesores 🥇":
             
             st.markdown("---")
             cl, cd = st.columns([1.5, 5])
-            with cl: st.subheader("TOTAL GENERAL")
-            with cd: st.table(pd.DataFrame([sumas]))
+            with cl: 
+                st.subheader("TOTAL GENERAL")
+            with cd: 
+                # Creamos el DataFrame y usamos set_index en una columna ficticia para que no aparezca el "0"
+                df_tot_clean = pd.DataFrame([sumas])
+                st.table(df_tot_clean.assign(Index="").set_index("Index"))
 
             # Botón Descarga
             t_desc = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
