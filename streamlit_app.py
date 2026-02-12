@@ -11,7 +11,7 @@ st.set_page_config(page_title="Sistema Comercial Grupo", layout="wide")
 def limpiar_texto(t):
     return " ".join(str(t).split()).replace(".", "").strip().upper()
 
-# Maestro de Asesores Global
+# Maestro de Asesores Global (Se mantiene igual)
 maestro_asesores = {
     "1115 JORGE ZORRO": "GRANVILLE TRELEW", "1114 FACUNDO BOTAZZI": "FORTECAR SAN NICOLAS",
     "1090 FACUNDO BLAIOTTA": "GRANVILLE JUNIN", "843 JUAN ANDRES SILVA": "FORTECAR TRENQUE LAUQUEN",
@@ -92,7 +92,7 @@ if pagina == "Panel de Objetivos Sucursales":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 2: RANKING (AJUSTES DE ORDEN Y DESCARGA)
+# OPCIÓN 2: RANKING (RESTAURADO PODIO Y AJUSTE DESCARGA)
 # =========================================================
 elif pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
@@ -149,7 +149,18 @@ elif pagina == "Ranking de Asesores 🥇":
             if filtro_sucursal: ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
             if filtro_asesor: ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
 
-            # TABLA PRINCIPAL
+            # --- PODIO (RESTAURADO) ---
+            if not filtro_sucursal and not filtro_asesor:
+                st.write("## 🎖️ Cuadro de Honor")
+                podio_cols = st.columns(3); meds, cols_p = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
+                for i in range(min(3, len(ranking))):
+                    asesor = ranking.iloc[i]
+                    with podio_cols[i]:
+                        st.markdown(f'<div style="text-align: center; border: 2px solid {cols_p[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{meds[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
+                st.divider()
+
+            # --- TABLA PRINCIPAL ---
+            # Ajuste de formato para Excel: "Icono + Numero" para los primeros 3, "Numero" para el resto
             ranks = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))]
             ranking['Rank'] = ranks
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
@@ -165,17 +176,17 @@ elif pagina == "Ranking de Asesores 🥇":
             
             # TOTALES
             df_v = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
-            totales = pd.DataFrame({'Métrica': ['TOTAL'], 'VN': [df_v['VN'].sum()], 'VO': [df_v['VO'].sum()], 'PDA': [df_v['PDA'].sum()], 'ADJ': [df_v['ADJ'].sum()], 'VE': [df_v['VE'].sum()], 'TOTAL': [df_v['TOTAL'].sum()], 'TOMA_VO': [df_v['TOMA_VO'].sum()]}).set_index('Métrica')
-            st.table(totales.style.set_properties(**{'text-align': 'center'}))
+            totales = pd.DataFrame({'Rank': ['-'], 'Asesor': ['TOTAL'], 'VN': [df_v['VN'].sum()], 'VO': [df_v['VO'].sum()], 'PDA': [df_v['PDA'].sum()], 'ADJ': [df_v['ADJ'].sum()], 'VE': [df_v['VE'].sum()], 'TOTAL': [df_v['TOTAL'].sum()], 'TOMA_VO': [df_v['TOMA_VO'].sum()], 'Sucursal': ['-']})
+            st.table(totales.set_index('Asesor').style.set_properties(**{'text-align': 'center'}))
 
-            # BOTÓN DE DESCARGA CON TOTALES
-            df_csv = pd.concat([final_display, totales.reset_index().rename(columns={'Métrica':'Asesor'})]).fillna("")
-            st.download_button(label="📥 Descargar Ranking CSV", data=df_csv.to_csv(index=False).encode('utf-8'), file_name='ranking_comercial.csv', mime='text/csv')
+            # BOTÓN DE DESCARGA CON FORMATO DE RANKING SEGURO PARA EXCEL
+            df_csv = pd.concat([final_display, totales]).fillna("")
+            st.download_button(label="📥 Descargar Ranking CSV", data=df_csv.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), file_name='ranking_comercial.csv', mime='text/csv')
 
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (COLUMNAS FALTANTES Y SEMÁFORO FUENTE)
+# OPCIÓN 3: CUMPLIMIENTO (INTACTO SEGÚN SOLICITUD)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -220,24 +231,21 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             df_m[col_pct_n1] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             df_m[col_pct_n2] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
 
-            # NUEVAS COLUMNAS: FALTANTES
             df_m["Faltante N1"] = (df_m[cols[1]] - df_m[cols[3]]).apply(lambda x: x if x > 0 else 0)
             df_m["Faltante N2"] = (df_m[cols[2]] - df_m[cols[3]]).apply(lambda x: x if x > 0 else 0)
 
-            # --- ESTILOS ---
             def resaltar_totales(row):
                 if "TOTAL" in str(row[cols[0]]).upper():
                     return ['font-weight: bold; background-color: #f0f2f6'] * len(row)
                 return [''] * len(row)
 
             def semaforo_fuente(val):
-                if val >= 1.0: color = '#28a745' # Verde
-                elif val >= 0.8: color = '#fd7e14' # Naranja
-                else: color = '#dc3545' # Rojo
+                if val >= 1.0: color = '#28a745'
+                elif val >= 0.8: color = '#fd7e14'
+                else: color = '#dc3545'
                 return f'color: {color}; font-weight: bold; text-align: center'
 
             st.write("### ✅ Resumen de Cumplimiento")
-            # Selección de columnas final
             df_final = df_m[[cols[0], cols[1], cols[2], cols[3], col_pct_n1, col_pct_n2, "Faltante N1", "Faltante N2"]]
             
             estilo_df = df_final.style.apply(resaltar_totales, axis=1) \
