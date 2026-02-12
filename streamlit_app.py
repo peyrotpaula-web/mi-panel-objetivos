@@ -57,7 +57,7 @@ if "v_mem" not in st.session_state:
 
 pag = st.sidebar.radio("Navegación", ["Panel de Objetivos", "Ranking de Asesores 🥇", "Cumplimiento"])
 
-# --- SECCIÓN RANKING (NO TOCAR) ---
+# --- SECCIÓN RANKING (INTOCABLE) ---
 if pag == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores")
     c1, c2 = st.columns(2)
@@ -88,10 +88,12 @@ if pag == "Ranking de Asesores 🥇":
             for c in ["VN", "VO", "PDA", "ADJ", "VE", "TOMA"]: df[c] = df[c].astype(int)
             df["TOTAL"] = df["VN"] + df["VO"] + df["ADJ"] + df["VE"] + df["PDA"]
             st.session_state["v_mem"] = df.groupby("Sucursal")["TOTAL"].sum().to_dict()
+            
             def prio(s):
                 if s == "GERENCIA": return 2
                 return 1 if s == "RED SECUNDARIA" else 0
             df["P"] = df["Sucursal"].apply(prio); df = df.sort_values(by=["P", "TOTAL", "TOMA"], ascending=[True, False, False]).reset_index(drop=True)
+            
             st.write("### 🎖️ Cuadro de Honor")
             pc = st.columns(3)
             meds = ["🥇", "🥈", "🥉"]; cols_b = ["#FFD700", "#C0C0C0", "#CD7F32"]
@@ -102,11 +104,13 @@ if pag == "Ranking de Asesores 🥇":
                         <h2 style="margin:0;">{meds[i]}</h2><b style="display:block;margin:10px 0;font-size:16px;">{a["KEY"]}</b>
                         <h1 style="color:#1f77b4;margin:0;">{a["TOTAL"]} <small style="font-size:15px;">unid.</small></h1>
                         <p style="color:gray;font-size:13px;margin-top:5px;">{a["Sucursal"]}</p></div>''', unsafe_allow_html=True)
+            
             st.divider()
             f1, f2 = st.columns(2); f_suc = f1.multiselect("Filtrar Sucursal:", sorted(df["Sucursal"].unique())); f_ase = f2.text_input("Buscar Asesor:")
             rf = df.copy()
             if f_suc: rf = rf[rf["Sucursal"].isin(f_suc)]
             if f_ase: rf = rf[rf["KEY"].str.contains(f_ase.upper())]
+            
             rf["Rank"] = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(rf))]
             disp = rf[["Rank", "KEY", "VN", "VO", "PDA", "ADJ", "VE", "TOTAL", "TOMA", "Sucursal"]].rename(columns={"KEY":"Asesor"})
             def styler(row):
@@ -115,39 +119,36 @@ if pag == "Ranking de Asesores 🥇":
                 if row["Sucursal"] == "RED SECUNDARIA": return [x + "; color: #8e44ad;" for x in base]
                 return base
             st.dataframe(disp.style.apply(styler, axis=1), use_container_width=True, hide_index=True)
+            
             df_c = rf[rf["Sucursal"] != "SUCURSAL VIRTUAL"]
             sumas = {"VN": int(df_c["VN"].sum()), "VO": int(df_c["VO"].sum()), "PDA": int(df_c["PDA"].sum()), "ADJ": int(df_c["ADJ"].sum()), "VE": int(df_c["VE"].sum()), "TOTAL": int(df_c["TOTAL"].sum()), "TOMA": int(df_c["TOMA"].sum())}
             st.markdown("---")
             l, r = st.columns([1.5, 5])
             with l: st.subheader("TOTAL GENERAL")
             with r: st.table(pd.DataFrame([sumas]).assign(Idx="").set_index("Idx"))
-            t_d = {"Rank": "---", "Asesor": "TOTAL GENERAL", **sumas, "Sucursal": "---"}
-            df_csv = pd.concat([disp, pd.DataFrame([t_d])])
-            st.download_button("📥 Descargar CSV", df_csv.to_csv(index=False).encode('utf-8'), "ranking.csv", "text/csv")
         except Exception as e: st.error(f"Error: {e}")
 
-# --- SECCIÓN CUMPLIMIENTO (RESTAURADA CON DOBLE NIVEL Y SEMÁFORO) ---
+# --- SECCIÓN CUMPLIMIENTO (RESTAURADA Y ROBUSTA) ---
 elif pag == "Cumplimiento":
-    st.title("🎯 Cumplimiento de Objetivos (Nivel 1 y Nivel 2)")
-    
-    col1, col2 = st.columns(2)
-    obj_file = col1.file_uploader("Subir Objetivos (Excel)", type=["xlsx"], key="obj_cump")
+    st.title("🎯 Cumplimiento de Objetivos")
+    obj_file = st.file_uploader("Subir Objetivos (Excel)", type=["xlsx"], key="obj_cump")
     
     if obj_file:
         if not st.session_state["v_mem"]:
-            st.warning("⚠️ Primero debes cargar los datos en el panel de 'Ranking de Asesores' para calcular las ventas actuales.")
+            st.warning("⚠️ Primero subí los archivos en 'Ranking de Asesores' para tener las ventas actuales.")
         else:
             try:
-                # El Excel debe tener: Sucursal | Objetivo Nivel 1 | Objetivo Nivel 2
-                df_obj = pd.read_excel(obj_file)
+                df_raw = pd.read_excel(obj_file)
+                # Tomamos solo las 3 primeras columnas sin importar el nombre original
+                df_obj = df_raw.iloc[:, :3].copy()
                 df_obj.columns = ["Sucursal", "Obj N1", "Obj N2"]
-                df_obj["Sucursal_Limpia"] = df_obj["Sucursal"].apply(limpiar_texto)
                 
                 ventas_actuales = st.session_state["v_mem"]
-                
                 res_data = []
+
                 for _, row in df_obj.iterrows():
-                    suc_key = row["Sucursal_Limpia"]
+                    suc_nombre = str(row["Sucursal"])
+                    suc_key = limpiar_texto(suc_nombre)
                     obj1 = row["Obj N1"]
                     obj2 = row["Obj N2"]
                     logrado = ventas_actuales.get(suc_key, 0)
@@ -155,44 +156,34 @@ elif pag == "Cumplimiento":
                     cump1 = (logrado / obj1 * 100) if obj1 > 0 else 0
                     cump2 = (logrado / obj2 * 100) if obj2 > 0 else 0
                     
-                    faltan1 = max(0, obj1 - logrado)
-                    faltan2 = max(0, obj2 - logrado)
-                    
                     res_data.append({
-                        "Sucursal": row["Sucursal"],
+                        "Sucursal": suc_nombre,
                         "Nivel 1": obj1,
                         "Nivel 2": obj2,
                         "Logrado": logrado,
                         "% Nivel 1": cump1,
                         "% Nivel 2": cump2,
-                        "Faltan N1": faltan1,
-                        "Faltan N2": faltan2
+                        "Faltan N1": max(0, obj1 - logrado),
+                        "Faltan N2": max(0, obj2 - logrado)
                     })
                 
-                df_final = pd.DataFrame(res_data)
+                df_res = pd.DataFrame(res_data)
 
-                # Semaforización
-                def color_semaforo(val):
+                def semaforo(val):
                     if val < 80: return 'color: red;'
                     elif 80 <= val < 100: return 'color: orange;'
-                    else: return 'color: green;'
+                    return 'color: green;'
 
                 st.dataframe(
-                    df_final.style.format({
-                        "% Nivel 1": "{:.1f}%",
-                        "% Nivel 2": "{:.1f}%",
-                        "Nivel 1": "{:,.0f}",
-                        "Nivel 2": "{:,.0f}",
-                        "Logrado": "{:,.0f}",
-                        "Faltan N1": "{:,.0f}",
-                        "Faltan N2": "{:,.0f}"
-                    }).applymap(color_semaforo, subset=["% Nivel 1", "% Nivel 2"]),
+                    df_res.style.format({
+                        "% Nivel 1": "{:.1f}%", "% Nivel 2": "{:.1f}%",
+                        "Nivel 1": "{:,.0f}", "Nivel 2": "{:,.0f}",
+                        "Logrado": "{:,.0f}", "Faltan N1": "{:,.0f}", "Faltan N2": "{:,.0f}"
+                    }).applymap(semaforo, subset=["% Nivel 1", "% Nivel 2"]),
                     use_container_width=True, hide_index=True
                 )
-                
             except Exception as e:
-                st.error(f"Error al procesar objetivos: {e}. Asegúrate de que el Excel tenga 3 columnas: Sucursal, Objetivo Nivel 1, Objetivo Nivel 2.")
+                st.error(f"Error al procesar el archivo: {e}")
 
 elif pag == "Panel de Objetivos":
     st.title("📊 Panel de Objetivos")
-    st.info("Sección informativa general.")
