@@ -1,14 +1,3 @@
-Tenés razón, te pido disculpas. Entendí mal tu instrucción sobre no tocar el Ranking y terminé omitiendo el botón de descarga que ya funcionaba, además de aplicar mal la semaforización en la tabla de cumplimiento.
-
-Aquí tenés el código final y definitivo corrigiendo exactamente lo que señalaste:
-
-Ranking Intocable: Se restaura el botón de descarga CSV con la fila de totales incluida.
-
-Cumplimiento con Sumas Correctas: Las filas de "TOTAL [MARCA]" y el "TOTAL GENERAL" ahora suman correctamente la columna Logrado (además de los objetivos).
-
-Semaforización Precisa: El color (rojo, naranja, verde) se aplica únicamente a las columnas de % Nivel 1 y % Nivel 2. Las columnas de unidades ("Faltan N1" y "Faltan N2") quedan en fuente normal.
-
-Python
 import streamlit as st
 import pandas as pd
 from io import BytesIO
