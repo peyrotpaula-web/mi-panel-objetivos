@@ -186,7 +186,7 @@ elif pagina == "Ranking de Asesores 🥇":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (INTACTO SEGÚN SOLICITUD)
+# OPCIÓN 3: CUMPLIMIENTO (CON MATCH FLEXIBLE PARA SUCURSALES)
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -202,13 +202,18 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             cols = df_m.columns
             df_m[cols[3]] = 0 # Logrado
             
+            # 1. Sincronización con búsqueda flexible
             for idx, row in df_m.iterrows():
-                suc_ex = str(row[cols[0]]).upper()
-                if "TOTAL" in suc_ex: continue
+                suc_excel = limpiar_texto(row[cols[0]])
+                if "TOTAL" in suc_excel: continue
+                
                 for s_mem, val in ventas_reales.items():
-                    if s_mem.upper() in suc_ex:
+                    s_mem_limpia = limpiar_texto(s_mem)
+                    # Si el nombre del excel está contenido en el maestro o viceversa
+                    if s_mem_limpia in suc_excel or suc_excel in s_mem_limpia:
                         df_m.at[idx, cols[3]] = val
 
+            # 2. Cálculo de Subtotales por Marca
             marcas = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR"]
             inicio = 0
             for idx, row in df_m.iterrows():
@@ -217,12 +222,14 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
                     df_m.at[idx, cols[3]] = df_m.iloc[inicio:idx, 3].sum()
                     inicio = idx + 1
 
+            # 3. Total General
             idx_total_general = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", na=False, case=False)].index
             if not idx_total_general.empty:
                 suma_marcas = df_m[(df_m[cols[0]].str.contains("TOTAL", case=False)) & (df_m[cols[0]].str.contains("|".join(marcas), case=False))][cols[3]].sum()
                 suma_red = df_m[(df_m[cols[0]].str.contains("RED SECUNDARIA", case=False)) & (~df_m[cols[0]].str.contains("TOTAL GENERAL", case=False))][cols[3]].sum()
                 df_m.at[idx_total_general[0], cols[3]] = suma_marcas + suma_red
 
+            # 4. Formateo y Faltantes
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
@@ -230,7 +237,6 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             col_pct_n1, col_pct_n2 = "% N1", "% N2"
             df_m[col_pct_n1] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             df_m[col_pct_n2] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
-
             df_m["Faltante N1"] = (df_m[cols[1]] - df_m[cols[3]]).apply(lambda x: x if x > 0 else 0)
             df_m["Faltante N2"] = (df_m[cols[2]] - df_m[cols[3]]).apply(lambda x: x if x > 0 else 0)
 
