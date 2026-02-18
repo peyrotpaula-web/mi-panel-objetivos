@@ -1,10 +1,3 @@
-Entendido, vamos a corregir esos detalles técnicos para que el Panel 3 refleje con exactitud los datos del Panel 2.
-
-El problema principal era la forma en que se extraían los valores de la fila "TOTAL GENERAL" y cómo Plotly gestionaba las etiquetas. He ajustado la lógica para asegurar que capture los porcentajes correctos y he activado text_auto=True en todos los gráficos para que veas los números exactos sobre las barras.
-
-Aquí tienes el código completo. Los Paneles 1 y 2 se mantienen idénticos a tu versión original, y el Panel 3 ha sido corregido:
-
-Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
