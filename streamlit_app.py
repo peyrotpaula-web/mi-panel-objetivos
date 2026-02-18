@@ -1,8 +1,3 @@
-Claro que sí. He tomado el código original y exacto que me pasaste para los Paneles 1 y 2, y he reconstruido el Panel 3 integrando las correcciones que solicitaste (porcentajes reales, etiquetas numéricas en las barras y sincronización total de datos).
-
-Aquí tienes el código completo y corregido:
-
-Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
