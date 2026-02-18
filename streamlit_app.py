@@ -206,19 +206,22 @@ elif pagina == "Panel de Objetivos Sucursales":
         df_m = st.session_state['df_panel_datos']
         cols = df_m.columns
         fila_total = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", case=False, na=False)].iloc[0]
+        
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Logrado Total", f"{int(fila_total[cols[3]])}")
         c2.metric("Objetivo N1", f"{int(fila_total[cols[1]])}")
         c3.metric("Objetivo N2", f"{int(fila_total[cols[2]])}")
-        c4.metric("% Cumpl. N1", f"{fila_total['% N1']:.1%}")
-        c5.metric("% Cumpl. N2", f"{fila_total['% N2']:.1%}")
+        
+        # AJUSTE: % en número entero sin decimales
+        c4.metric("% Cumpl. N1", f"{fila_total['% N1']:.0%}")
+        c5.metric("% Cumpl. N2", f"{fila_total['% N2']:.0%}")
+        
         st.divider()
 
         # 1. RENDIMIENTO POR SUCURSAL (NÚMEROS MÁS GRANDES)
         st.subheader("Rendimiento por Sucursal")
         df_suc = df_m[~df_m[cols[0]].str.contains("TOTAL", case=False, na=False)].copy()
         fig_barras = px.bar(df_suc, x=cols[0], y=[cols[3], cols[1], cols[2]], barmode='group', text_auto=True, labels={'value': 'Unidades', 'variable': 'Hito'}, color_discrete_map={cols[3]: '#00CC96', cols[1]: '#636EFA', cols[2]: '#AB63FA'})
-        # AJUSTE: Tamaño de fuente de los números en las barras
         fig_barras.update_traces(textfont_size=14, textposition="outside")
         st.plotly_chart(fig_barras, use_container_width=True)
 
@@ -228,11 +231,11 @@ elif pagina == "Panel de Objetivos Sucursales":
             st.subheader("Cumplimiento por Marca (N1)")
             df_marcas = df_m[df_m[cols[0]].str.contains("TOTAL", case=False) & ~df_m[cols[0]].str.contains("GENERAL", case=False)].copy()
             df_marcas = df_marcas.sort_values("% N1", ascending=True)
-            fig_m = px.bar(df_marcas, x="% N1", y=cols[0], orientation='h', text_auto='.1%', color="% N1", color_continuous_scale='RdYlGn')
+            fig_m = px.bar(df_marcas, x="% N1", y=cols[0], orientation='h', text_auto='.0%', color="% N1", color_continuous_scale='RdYlGn')
             st.plotly_chart(fig_m, use_container_width=True)
         with col_r:
             st.subheader("Avance Global")
-            fig_g = go.Figure(go.Indicator(mode="gauge+number", value=fila_total["% N1"]*100, number={'suffix': "%"}, gauge={'axis': {'range': [0, 110]}, 'bar': {'color': "black"}, 'steps': [{'range': [0, 80], 'color': "#ff4b4b"}, {'range': [80, 90], 'color': "#ffa500"}, {'range': [90, 110], 'color': "#00CC96"}]}))
+            fig_g = go.Figure(go.Indicator(mode="gauge+number", value=fila_total["% N1"]*100, number={'suffix': "%", 'valueformat': '.0f'}, gauge={'axis': {'range': [0, 110]}, 'bar': {'color': "black"}, 'steps': [{'range': [0, 80], 'color': "#ff4b4b"}, {'range': [80, 90], 'color': "#ffa500"}, {'range': [90, 110], 'color': "#00CC96"}]}))
             st.plotly_chart(fig_g, use_container_width=True)
 
         # 3. MATRIZ DE SEGUIMIENTO (ORDENADA POR %)
@@ -240,18 +243,16 @@ elif pagina == "Panel de Objetivos Sucursales":
         m1, m2 = st.columns(2)
         with m1:
             st.success("🟢 Líderes (>= 90% N1)")
-            # AJUSTE: Ordenar por % N1 de mayor a menor
             df_lideres = df_suc[df_suc["% N1"] >= 0.9][[cols[0], "% N1", "Faltante N1"]].sort_values("% N1", ascending=False)
-            st.dataframe(df_lideres.style.format({"% N1": "{:.1%}"}), hide_index=True, use_container_width=True)
+            st.dataframe(df_lideres.style.format({"% N1": "{:.0%}"}), hide_index=True, use_container_width=True)
         with m2:
             st.error("🔴 Alerta (< 90% N1)")
-            # AJUSTE: Ordenar por % N1 de mayor a menor
             df_alerta = df_suc[df_suc["% N1"] < 0.9][[cols[0], "% N1", "Faltante N1"]].sort_values("% N1", ascending=False)
-            st.dataframe(df_alerta.style.format({"% N1": "{:.1%}"}), hide_index=True, use_container_width=True)
+            st.dataframe(df_alerta.style.format({"% N1": "{:.0%}"}), hide_index=True, use_container_width=True)
 
-        # 4. GRÁFICO SEMÁFORO (NUEVO)
+        # 4. GRÁFICO SEMÁFORO
         st.subheader("🚦 Semáforo de Cumplimiento")
         df_sem = df_suc.sort_values("% N1", ascending=False)
-        fig_sem = px.bar(df_sem, x=cols[0], y="% N1", color="% N1", text_auto=".1%", color_continuous_scale=['#dc3545', '#fd7e14', '#28a745'], range_color=[0, 1])
+        fig_sem = px.bar(df_sem, x=cols[0], y="% N1", color="% N1", text_auto=".0%", color_continuous_scale=['#dc3545', '#fd7e14', '#28a745'], range_color=[0, 1])
         fig_sem.add_hline(y=0.9, line_dash="dash", line_color="white", annotation_text="Meta 90%")
         st.plotly_chart(fig_sem, use_container_width=True)
