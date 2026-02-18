@@ -231,32 +231,152 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: PANEL DE OBJETIVOS SUCURSALES
+# OPCIÓN 3: PANEL DE OBJETIVOS SUCURSALES (DINÁMICO)
 # =========================================================
 elif pagina == "Panel de Objetivos Sucursales":
     st.title("📊 Panel de Control de Objetivos Sucursales")
-    uploaded_file = st.file_uploader("Sube el archivo Excel de Objetivos", type=["xlsx"], key="obj_panel_key")
-    if uploaded_file:
+    
+    # 1. Recuperar datos procesados del Panel 2
+    # Buscamos en el estado de la sesión si ya existe el DataFrame procesado
+    # Para que esto funcione, en el Panel 2 deberías guardar: st.session_state['df_cumplimiento_final'] = df_m
+    
+    if 'ventas_sucursal_memoria' not in st.session_state:
+        st.warning("⚠️ No hay datos de ventas. Por favor, carga los archivos en el panel 'Ranking de Asesores'.")
+        st.stop()
+
+    # Nota: Para máxima precisión, este panel requiere que el archivo de objetivos 
+    # ya haya sido cargado y procesado en la pestaña "Cumplimiento de Objetivos".
+    # Intentamos obtener df_m (el cuadro del panel 2)
+    
+    # Si no quieres navegar al panel 2 para que cargue, podemos disparar la lectura aquí si el archivo está presente
+    f_meta = st.file_uploader("Sube el archivo de Objetivos para alimentar este panel", type=["xlsx"], key="panel3_uploader")
+    
+    if f_meta:
         try:
-            df = pd.read_excel(uploaded_file)
-            df.columns = [str(c).strip() for c in df.columns]
-            col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
-            df['Marca'] = "OTRAS"; marca_actual = "OTRAS"
-            for i, row in df.iterrows():
-                texto = str(row[col_obj]).upper()
-                if "OPENCARS" in texto: marca_actual = "OPENCARS"
-                elif "PAMPAWAGEN" in texto: marca_actual = "PAMPAWAGEN"
-                elif "FORTECAR" in texto: marca_actual = "FORTECAR"
-                elif "GRANVILLE" in texto: marca_actual = "GRANVILLE"
-                elif "CITROEN" in texto: marca_actual = "CITROEN SN"
-                elif "RED" in texto: marca_actual = "RED SECUNDARIA"
-                df.at[i, 'Marca'] = marca_actual
-            df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].dropna(subset=[col_n1]).copy()
-            marca_sel = st.sidebar.selectbox("Empresa:", ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist()))
-            df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
-            df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).fillna(0).round(0).astype(int)
-            st.subheader(f"📍 Resumen: {marca_sel}")
-            fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group', color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
-            st.plotly_chart(fig_bar, use_container_width=True)
-            st.table(df_final[[col_obj, col_log, col_n1, '%_int']].set_index(col_obj))
-        except Exception as e: st.error(f"Error: {e}")
+            # --- PROCESAMIENTO IGUAL AL PANEL 2 ---
+            df_m = pd.read_excel(f_meta)
+            df_m.columns = [str(c).strip() for c in df_m.columns]
+            cols = df_m.columns # 0:Sucursal, 1:N1, 2:N2, 3:Logrado
+            
+            # Limpieza y cruce (reutilizando tu lógica del Panel 2)
+            ventas_reales = st.session_state.get('ventas_sucursal_memoria', {})
+            df_m[cols[3]] = 0
+            for idx, row in df_m.iterrows():
+                suc_excel = limpiar_texto(row[cols[0]])
+                if "TOTAL" in suc_excel: continue
+                for s_mem, val in ventas_reales.items():
+                    if limpiar_texto(s_mem) in suc_excel or suc_excel in limpiar_texto(s_mem):
+                        df_m.at[idx, cols[3]] = val
+
+            # Cálculos de Totales por Marca
+            marcas_lista = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR"]
+            inicio = 0
+            for idx, row in df_m.iterrows():
+                nombre_fila = str(row[cols[0]]).upper()
+                if "TOTAL" in nombre_fila and any(m in nombre_fila for m in marcas_lista):
+                    df_m.at[idx, cols[3]] = df_m.iloc[inicio:idx, 3].sum()
+                    inicio = idx + 1
+
+            # --- CÁLCULOS ESPECÍFICOS PARA LOS GRÁFICOS ---
+            # Filtrar solo sucursales (quitar totales para las barras)
+            df_sucursales = df_m[~df_m[cols[0]].str.contains("TOTAL", case=False, na=False)].copy()
+            df_sucursales["% N1"] = (df_sucursales[cols[3]] / df_sucursales[cols[1]]).fillna(0)
+            df_sucursales["% N2"] = (df_sucursales[cols[3]] / df_sucursales[cols[2]]).fillna(0)
+            
+            # Datos Globales (del Total General)
+            total_gen_row = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", case=False, na=False)]
+            if not total_gen_row.empty:
+                log_tot = total_gen_row[cols[3]].values[0] [cite: 4, 113]
+                obj_n1 = total_gen_row[cols[1]].values[0] [cite: 5]
+                obj_n2 = total_gen_row[cols[2]].values[0] [cite: 7, 9]
+                pct_n1 = (log_tot / obj_n1) if obj_n1 > 0 else 0 [cite: 10]
+                pct_n2 = (log_tot / obj_n2) if obj_n2 > 0 else 0
+
+            # ---------------------------------------------------------
+            # 1. TARJETAS (5 Unidades)
+            # ---------------------------------------------------------
+            st.subheader("Resumen de Gestión: GRUPO TOTAL") [cite: 2]
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric("Logrado Total", f"{log_tot}") [cite: 3, 4]
+            c2.metric("Objetivo N1", f"{obj_n1}") [cite: 5]
+            c3.metric("Objetivo N2", f"{obj_n2}") [cite: 7, 9]
+            c4.metric("% Global (N1)", f"{pct_n1:.0%}") [cite: 8, 10]
+            c5.metric("% Global (N2)", f"{pct_n2:.0%}")
+
+            st.divider()
+
+            # ---------------------------------------------------------
+            # 2. RENDIMIENTO POR SUCURSAL (Barras Agrupadas)
+            # ---------------------------------------------------------
+            st.subheader("Rendimiento por Sucursal") [cite: 6]
+            fig_rend = px.bar(df_sucursales, x=cols[0], y=[cols[3], cols[1], cols[2]],
+                             barmode='group',
+                             labels={'value': 'Unidades', 'variable': 'Tipo'},
+                             color_discrete_map={cols[3]: '#00CC96', cols[1]: '#636EFA', cols[2]: '#AB63FA'}) [cite: 15, 16, 18]
+            st.plotly_chart(fig_rend, use_container_width=True)
+
+            # ---------------------------------------------------------
+            # 3. RANKING POR MARCA Y TERMÓMETRO
+            # ---------------------------------------------------------
+            col_rank, col_termo = st.columns([2, 1])
+            
+            with col_rank:
+                st.subheader("Ranking de Cumplimiento por Marca (Obj N1)") [cite: 82]
+                df_marcas = df_m[df_m[cols[0]].str.contains("TOTAL", case=False) & 
+                                 ~df_m[cols[0]].str.contains("GENERAL", case=False)].copy()
+                df_marcas["%"] = (df_marcas[cols[3]] / df_marcas[cols[1]] * 100) [cite: 90, 91, 92, 93, 94, 106]
+                df_marcas = df_marcas.sort_values("%", ascending=True)
+                
+                fig_marca = px.bar(df_marcas, x="%", y=cols[0], orientation='h', 
+                                  text=df_marcas["%"].apply(lambda x: f'{x:.0f}%')) [cite: 104]
+                st.plotly_chart(fig_marca, use_container_width=True)
+
+            with col_termo:
+                st.subheader("Avance Global") [cite: 105]
+                fig_gauge = go.Figure(go.Indicator(
+                    mode = "gauge+number",
+                    value = pct_n1 * 100,
+                    domain = {'x': [0, 1], 'y': [0, 1]},
+                    gauge = {
+                        'axis': {'range': [0, 120]},
+                        'bar': {'color': "black"},
+                        'steps': [
+                            {'range': [0, 80], 'color': "#ff4b4b"},
+                            {'range': [80, 90], 'color': "#ffa500"},
+                            {'range': [90, 120], 'color': "#00CC96"}]
+                    })) [cite: 108, 109, 110, 112, 113, 115]
+                st.plotly_chart(fig_gauge, use_container_width=True)
+
+            # ---------------------------------------------------------
+            # 4. MATRIZ DE CUMPLIMIENTO (REGLA 90%)
+            # ---------------------------------------------------------
+            st.subheader("Matriz de Cumplimiento (Faltantes N1 y N2)") [cite: 116]
+            
+            # Líderes >= 90%
+            lideres = df_sucursales[df_sucursales["% N1"] >= 0.9].copy() [cite: 117]
+            # Alerta < 90%
+            alerta = df_sucursales[df_sucursales["% N1"] < 0.9].copy() [cite: 118]
+            
+            m1, m2 = st.columns(2)
+            with m1:
+                st.success("🟢 Líderes (>= 90%)") [cite: 117]
+                st.dataframe(lideres[[cols[0], "% N1", "Faltante N1", "Faltante N2"]].style.format({"% N1": "{:.0%}"}), hide_index=True) [cite: 119]
+            with m2:
+                st.error("🔴 Alerta (< 90%)") [cite: 118]
+                st.dataframe(alerta[[cols[0], "% N1", "Faltante N1", "Faltante N2"]].style.format({"% N1": "{:.0%}"}), hide_index=True) [cite: 119]
+
+            # ---------------------------------------------------------
+            # 5. SEMÁFORO DE CUMPLIMIENTO
+            # ---------------------------------------------------------
+            st.subheader("Semáforo de Cumplimiento") [cite: 120]
+            df_semaforo = df_sucursales.sort_values("% N1", ascending=False)
+            
+            fig_heat = px.imshow([df_semaforo["% N1"] * 100],
+                                x=df_semaforo[cols[0]],
+                                color_continuous_scale='RdYlGn',
+                                aspect="auto",
+                                text_auto=".0f") [cite: 123, 124, 125, 126, 127]
+            st.plotly_chart(fig_heat, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Error procesando el panel dinámico: {e}")
