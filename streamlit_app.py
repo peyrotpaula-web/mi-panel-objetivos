@@ -1,14 +1,3 @@
-¡Excelente! He realizado esos tres ajustes específicos manteniendo la estructura intacta de tus Paneles 1 y 2.
-
-Aquí tienes los cambios aplicados:
-
-Gráfico de Barras: Se aumentó el tamaño de la fuente de los números sobre las barras para que sean más legibles.
-
-Matriz de Seguimiento: Ahora las tablas de Líderes y Alertas se ordenan automáticamente de mayor a menor porcentaje.
-
-Semáforo: Añadí el gráfico de calor (Heatmap) al final del Panel 3 para visualizar rápidamente el estado de todas las sucursales.
-
-Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
