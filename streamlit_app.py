@@ -58,43 +58,17 @@ maestro_asesores = {
 if 'ventas_sucursal_memoria' not in st.session_state:
     st.session_state['ventas_sucursal_memoria'] = {}
 
-pagina = st.sidebar.radio("Seleccionar Panel:", ["Panel de Objetivos Sucursales", "Ranking de Asesores 🥇", "Cumplimiento de Objetivos 🎯"])
+# --- CAMBIO 1: AJUSTE DE ORDEN EN EL FILTRO LATERAL ---
+pagina = st.sidebar.radio("Seleccionar Panel:", [
+    "Ranking de Asesores 🥇", 
+    "Cumplimiento de Objetivos 🎯", 
+    "Panel de Objetivos Sucursales"
+])
 
 # =========================================================
-# OPCIÓN 1: PANEL DE OBJETIVOS (INTACTO)
+# OPCIÓN 1: RANKING
 # =========================================================
-if pagina == "Panel de Objetivos Sucursales":
-    st.title("📊 Panel de Control de Objetivos Sucursales")
-    uploaded_file = st.file_uploader("Sube el archivo Excel de Objetivos", type=["xlsx"], key="obj_panel_key")
-    if uploaded_file:
-        try:
-            df = pd.read_excel(uploaded_file)
-            df.columns = [str(c).strip() for c in df.columns]
-            col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
-            df['Marca'] = "OTRAS"; marca_actual = "OTRAS"
-            for i, row in df.iterrows():
-                texto = str(row[col_obj]).upper()
-                if "OPENCARS" in texto: marca_actual = "OPENCARS"
-                elif "PAMPAWAGEN" in texto: marca_actual = "PAMPAWAGEN"
-                elif "FORTECAR" in texto: marca_actual = "FORTECAR"
-                elif "GRANVILLE" in texto: marca_actual = "GRANVILLE"
-                elif "CITROEN" in texto: marca_actual = "CITROEN SN"
-                elif "RED" in texto: marca_actual = "RED SECUNDARIA"
-                df.at[i, 'Marca'] = marca_actual
-            df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].dropna(subset=[col_n1]).copy()
-            marca_sel = st.sidebar.selectbox("Empresa:", ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist()))
-            df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
-            df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).fillna(0).round(0).astype(int)
-            st.subheader(f"📍 Resumen: {marca_sel}")
-            fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group', color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
-            st.plotly_chart(fig_bar, use_container_width=True)
-            st.table(df_final[[col_obj, col_log, col_n1, '%_int']].set_index(col_obj))
-        except Exception as e: st.error(f"Error: {e}")
-
-# =========================================================
-# OPCIÓN 2: RANKING (RESTAURADO PODIO Y AJUSTE DESCARGA)
-# =========================================================
-elif pagina == "Ranking de Asesores 🥇":
+if pagina == "Ranking de Asesores 🥇":
     st.title("🏆 Ranking de Asesores Comercial")
     c1, c2 = st.columns(2)
     with c1: u45 = st.file_uploader("Archivo U45", type=["xlsx", "xls", "csv"], key="u45_final")
@@ -132,7 +106,6 @@ elif pagina == "Ranking de Asesores 🥇":
             ranking_base['TOTAL'] = ranking_base['VN'] + ranking_base['VO'] + ranking_base['ADJ'] + ranking_base['VE'] + ranking_base['PDA']
             st.session_state['ventas_sucursal_memoria'] = ranking_base.groupby('Sucursal')['TOTAL'].sum().to_dict()
 
-            # Lógica de Prioridad: 0: Normal, 1: Red Secundaria, 2: Gerencia
             def asignar_prioridad(suc):
                 if suc == "GERENCIA": return 2
                 if suc == "RED SECUNDARIA": return 1
@@ -149,7 +122,6 @@ elif pagina == "Ranking de Asesores 🥇":
             if filtro_sucursal: ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
             if filtro_asesor: ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
 
-            # --- PODIO (RESTAURADO) ---
             if not filtro_sucursal and not filtro_asesor:
                 st.write("## 🎖️ Cuadro de Honor")
                 podio_cols = st.columns(3); meds, cols_p = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
@@ -159,8 +131,6 @@ elif pagina == "Ranking de Asesores 🥇":
                         st.markdown(f'<div style="text-align: center; border: 2px solid {cols_p[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{meds[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
                 st.divider()
 
-            # --- TABLA PRINCIPAL ---
-            # Ajuste de formato para Excel: "Icono + Numero" para los primeros 3, "Numero" para el resto
             ranks = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))]
             ranking['Rank'] = ranks
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
@@ -174,19 +144,17 @@ elif pagina == "Ranking de Asesores 🥇":
 
             st.dataframe(final_display.style.apply(color_y_centrado, axis=1), use_container_width=True, hide_index=True)
             
-            # TOTALES
             df_v = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
             totales = pd.DataFrame({'Rank': ['-'], 'Asesor': ['TOTAL'], 'VN': [df_v['VN'].sum()], 'VO': [df_v['VO'].sum()], 'PDA': [df_v['PDA'].sum()], 'ADJ': [df_v['ADJ'].sum()], 'VE': [df_v['VE'].sum()], 'TOTAL': [df_v['TOTAL'].sum()], 'TOMA_VO': [df_v['TOMA_VO'].sum()], 'Sucursal': ['-']})
             st.table(totales.set_index('Asesor').style.set_properties(**{'text-align': 'center'}))
 
-            # BOTÓN DE DESCARGA CON FORMATO DE RANKING SEGURO PARA EXCEL
             df_csv = pd.concat([final_display, totales]).fillna("")
             st.download_button(label="📥 Descargar Ranking CSV", data=df_csv.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), file_name='ranking_comercial.csv', mime='text/csv')
 
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: CUMPLIMIENTO (CON MATCH FLEXIBLE PARA SUCURSALES)
+# OPCIÓN 2: CUMPLIMIENTO
 # =========================================================
 elif pagina == "Cumplimiento de Objetivos 🎯":
     st.title("🎯 Cumplimiento de Objetivos")
@@ -202,18 +170,14 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
             cols = df_m.columns
             df_m[cols[3]] = 0 # Logrado
             
-            # 1. Sincronización con búsqueda flexible
             for idx, row in df_m.iterrows():
                 suc_excel = limpiar_texto(row[cols[0]])
                 if "TOTAL" in suc_excel: continue
-                
                 for s_mem, val in ventas_reales.items():
                     s_mem_limpia = limpiar_texto(s_mem)
-                    # Si el nombre del excel está contenido en el maestro o viceversa
                     if s_mem_limpia in suc_excel or suc_excel in s_mem_limpia:
                         df_m.at[idx, cols[3]] = val
 
-            # 2. Cálculo de Subtotales por Marca
             marcas = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR"]
             inicio = 0
             for idx, row in df_m.iterrows():
@@ -222,14 +186,12 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
                     df_m.at[idx, cols[3]] = df_m.iloc[inicio:idx, 3].sum()
                     inicio = idx + 1
 
-            # 3. Total General
             idx_total_general = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", na=False, case=False)].index
             if not idx_total_general.empty:
                 suma_marcas = df_m[(df_m[cols[0]].str.contains("TOTAL", case=False)) & (df_m[cols[0]].str.contains("|".join(marcas), case=False))][cols[3]].sum()
                 suma_red = df_m[(df_m[cols[0]].str.contains("RED SECUNDARIA", case=False)) & (~df_m[cols[0]].str.contains("TOTAL GENERAL", case=False))][cols[3]].sum()
                 df_m.at[idx_total_general[0], cols[3]] = suma_marcas + suma_red
 
-            # 4. Formateo y Faltantes
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
@@ -262,6 +224,39 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
                     "Faltante N1": "{:,.0f}", "Faltante N2": "{:,.0f}"
                 })
 
-            st.dataframe(estilo_df, use_container_width=True, hide_index=True)
+            # --- CAMBIO 2: AJUSTE DE ALTURA PARA ELIMINAR DOBLE BARRA ---
+            # Se agrega 'height' para que el contenedor sea lo suficientemente grande y no cree scroll interno
+            st.dataframe(estilo_df, use_container_width=True, hide_index=True, height=(len(df_final) + 1) * 36)
             
+        except Exception as e: st.error(f"Error: {e}")
+
+# =========================================================
+# OPCIÓN 3: PANEL DE OBJETIVOS SUCURSALES
+# =========================================================
+elif pagina == "Panel de Objetivos Sucursales":
+    st.title("📊 Panel de Control de Objetivos Sucursales")
+    uploaded_file = st.file_uploader("Sube el archivo Excel de Objetivos", type=["xlsx"], key="obj_panel_key")
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file)
+            df.columns = [str(c).strip() for c in df.columns]
+            col_obj, col_n1, col_n2, col_log = df.columns[0], df.columns[1], df.columns[2], df.columns[3]
+            df['Marca'] = "OTRAS"; marca_actual = "OTRAS"
+            for i, row in df.iterrows():
+                texto = str(row[col_obj]).upper()
+                if "OPENCARS" in texto: marca_actual = "OPENCARS"
+                elif "PAMPAWAGEN" in texto: marca_actual = "PAMPAWAGEN"
+                elif "FORTECAR" in texto: marca_actual = "FORTECAR"
+                elif "GRANVILLE" in texto: marca_actual = "GRANVILLE"
+                elif "CITROEN" in texto: marca_actual = "CITROEN SN"
+                elif "RED" in texto: marca_actual = "RED SECUNDARIA"
+                df.at[i, 'Marca'] = marca_actual
+            df_suc = df[~df[col_obj].str.contains("TOTAL", na=False, case=False)].dropna(subset=[col_n1]).copy()
+            marca_sel = st.sidebar.selectbox("Empresa:", ["GRUPO TOTAL"] + sorted(df_suc['Marca'].unique().tolist()))
+            df_final = df_suc if marca_sel == "GRUPO TOTAL" else df_suc[df_suc['Marca'] == marca_sel].copy()
+            df_final['%_int'] = (df_final[col_log] / df_final[col_n1] * 100).fillna(0).round(0).astype(int)
+            st.subheader(f"📍 Resumen: {marca_sel}")
+            fig_bar = px.bar(df_final, x=col_obj, y=[col_log, col_n1, col_n2], barmode='group', color_discrete_sequence=["#00CC96", "#636EFA", "#AB63FA"], text_auto=True)
+            st.plotly_chart(fig_bar, use_container_width=True)
+            st.table(df_final[[col_obj, col_log, col_n1, '%_int']].set_index(col_obj))
         except Exception as e: st.error(f"Error: {e}")
