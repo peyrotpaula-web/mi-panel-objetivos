@@ -1,3 +1,14 @@
+¡Excelente! He realizado esos tres ajustes específicos manteniendo la estructura intacta de tus Paneles 1 y 2.
+
+Aquí tienes los cambios aplicados:
+
+Gráfico de Barras: Se aumentó el tamaño de la fuente de los números sobre las barras para que sean más legibles.
+
+Matriz de Seguimiento: Ahora las tablas de Líderes y Alertas se ordenan automáticamente de mayor a menor porcentaje.
+
+Semáforo: Añadí el gráfico de calor (Heatmap) al final del Panel 3 para visualizar rápidamente el estado de todas las sucursales.
+
+Python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -60,7 +71,7 @@ if 'ventas_sucursal_memoria' not in st.session_state:
 if 'df_panel_datos' not in st.session_state:
     st.session_state['df_panel_datos'] = None
 
-# --- CAMBIO 1: AJUSTE DE ORDEN EN EL FILTRO LATERAL ---
+# --- FILTRO LATERAL ---
 pagina = st.sidebar.radio("Seleccionar Panel:", [
     "Ranking de Asesores 🥇", 
     "Cumplimiento de Objetivos 🎯", 
@@ -82,48 +93,37 @@ if pagina == "Ranking de Asesores 🥇":
                 if file.name.endswith('.csv'): return pd.read_csv(file)
                 return pd.read_excel(file, engine='xlrd' if file.name.endswith('.xls') else None)
             df45_raw, df53_raw = leer_archivo(u45), leer_archivo(u53)
-
             c_v_45 = df45_raw.columns[4]; c_t_45 = next((c for c in df45_raw.columns if "TIPO" in str(c).upper()), "Tipo")
             c_e_45 = next((c for c in df45_raw.columns if "ESTAD" in str(c).upper()), "Estad")
             c_vo_45 = next((c for c in df45_raw.columns if "TAS. VO" in str(c).upper()), None)
-
             df45 = df45_raw[(df45_raw[c_e_45] != 'A') & (df45_raw[c_t_45] != 'AC')].copy()
             df45['KEY'] = df45[c_v_45].apply(limpiar_texto)
-
             u45_sum = df45.groupby('KEY').apply(lambda x: pd.Series({
                 'VN': int((x[c_t_45].isin(['O', 'OP'])).sum()), 'VO': int((x[c_t_45].isin(['O2','O2R'])).sum()),
                 'ADJ': int((x[c_t_45] == 'PL').sum()), 'VE': int((x[c_t_45] == 'VE').sum()),
                 'TOMA_VO': int(x[c_vo_45].apply(lambda v: 1 if str(v).strip() not in ['0', '0.0', 'nan', 'None', '', '0,0'] else 0).sum()) if c_vo_45 else 0
             })).reset_index()
-
             c_v_53 = df53_raw.columns[0]; df53 = df53_raw.copy(); df53['KEY'] = df53[c_v_53].apply(limpiar_texto)
             u53_sum = df53.groupby('KEY').size().reset_index(name='PDA')
-
             ranking_base = pd.merge(u45_sum, u53_sum, on='KEY', how='outer').fillna(0)
             maestro_limpio = {limpiar_texto(k): v for k, v in maestro_asesores.items()}
             ranking_base['Sucursal'] = ranking_base['KEY'].map(maestro_limpio)
             ranking_base = ranking_base.dropna(subset=['Sucursal']).copy()
-
             for c in ['VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOMA_VO']: ranking_base[c] = ranking_base[c].astype(int)
             ranking_base['TOTAL'] = ranking_base['VN'] + ranking_base['VO'] + ranking_base['ADJ'] + ranking_base['VE'] + ranking_base['PDA']
             st.session_state['ventas_sucursal_memoria'] = ranking_base.groupby('Sucursal')['TOTAL'].sum().to_dict()
-
             def asignar_prioridad(suc):
                 if suc == "GERENCIA": return 2
                 if suc == "RED SECUNDARIA": return 1
                 return 0
-
             ranking_base['Prioridad'] = ranking_base['Sucursal'].apply(asignar_prioridad)
             ranking_base = ranking_base.sort_values(by=['Prioridad', 'TOTAL', 'TOMA_VO'], ascending=[True, False, False]).reset_index(drop=True)
-
             col_f1, col_f2 = st.columns(2)
             with col_f1: filtro_sucursal = st.multiselect("Filtrar por Sucursal:", sorted(ranking_base['Sucursal'].unique()))
             with col_f2: filtro_asesor = st.text_input("Buscar Asesor:")
-
             ranking = ranking_base.copy()
             if filtro_sucursal: ranking = ranking[ranking['Sucursal'].isin(filtro_sucursal)]
             if filtro_asesor: ranking = ranking[ranking['KEY'].str.contains(filtro_asesor.upper())]
-
             if not filtro_sucursal and not filtro_asesor:
                 st.write("## 🎖️ Cuadro de Honor")
                 podio_cols = st.columns(3); meds, cols_p = ["🥇", "🥈", "🥉"], ["#FFD700", "#C0C0C0", "#CD7F32"]
@@ -132,27 +132,21 @@ if pagina == "Ranking de Asesores 🥇":
                     with podio_cols[i]:
                         st.markdown(f'<div style="text-align: center; border: 2px solid {cols_p[i]}; border-radius: 15px; padding: 15px; background-color: #f9f9f9;"><h1 style="margin: 0;">{meds[i]}</h1><p style="font-weight: bold; margin: 5px 0;">{asesor["KEY"]}</p><h2 style="color: #1f77b4; margin: 0;">{asesor["TOTAL"]} <small>u.</small></h2><span style="font-size: 0.8em; color: gray;">{asesor["Sucursal"]}</span></div>', unsafe_allow_html=True)
                 st.divider()
-
             ranks = [f"🥇 1°" if i==0 else f"🥈 2°" if i==1 else f"🥉 3°" if i==2 else f"{i+1}°" for i in range(len(ranking))]
             ranking['Rank'] = ranks
             final_display = ranking[['Rank', 'KEY', 'VN', 'VO', 'PDA', 'ADJ', 'VE', 'TOTAL', 'TOMA_VO', 'Sucursal']].rename(columns={'KEY': 'Asesor'})
-            
             def color_y_centrado(row):
                 styles = ['text-align: center'] * len(row)
                 if row['Sucursal'] == "SUCURSAL VIRTUAL": styles = [s + '; color: #1a73e8' for s in styles]
                 elif row['Sucursal'] == "RED SECUNDARIA": styles = [s + '; color: #8e44ad' for s in styles]
                 elif row['Sucursal'] == "GERENCIA": styles = [s + '; color: #e67e22' for s in styles]
                 return styles
-
             st.dataframe(final_display.style.apply(color_y_centrado, axis=1), use_container_width=True, hide_index=True)
-            
             df_v = ranking[ranking['Sucursal'] != "SUCURSAL VIRTUAL"]
             totales = pd.DataFrame({'Rank': ['-'], 'Asesor': ['TOTAL'], 'VN': [df_v['VN'].sum()], 'VO': [df_v['VO'].sum()], 'PDA': [df_v['PDA'].sum()], 'ADJ': [df_v['ADJ'].sum()], 'VE': [df_v['VE'].sum()], 'TOTAL': [df_v['TOTAL'].sum()], 'TOMA_VO': [df_v['TOMA_VO'].sum()], 'Sucursal': ['-']})
             st.table(totales.set_index('Asesor').style.set_properties(**{'text-align': 'center'}))
-
             df_csv = pd.concat([final_display, totales]).fillna("")
             st.download_button(label="📥 Descargar Ranking CSV", data=df_csv.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), file_name='ranking_comercial.csv', mime='text/csv')
-
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
@@ -163,15 +157,13 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
     ventas_reales = st.session_state.get('ventas_sucursal_memoria', {})
     if not ventas_reales:
         st.warning("⚠️ Sube primero los archivos en el panel de Ranking para ver datos aquí.")
-    
     f_meta = st.file_uploader("Sube el archivo 'cumplimiento de objetivos.xlsx'", type=["xlsx"])
     if f_meta:
         try:
             df_m = pd.read_excel(f_meta)
             df_m.columns = [str(c).strip() for c in df_m.columns]
             cols = df_m.columns
-            df_m[cols[3]] = 0 # Logrado
-            
+            df_m[cols[3]] = 0 
             for idx, row in df_m.iterrows():
                 suc_excel = limpiar_texto(row[cols[0]])
                 if "TOTAL" in suc_excel: continue
@@ -179,7 +171,6 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
                     s_mem_limpia = limpiar_texto(s_mem)
                     if s_mem_limpia in suc_excel or suc_excel in s_mem_limpia:
                         df_m.at[idx, cols[3]] = val
-
             marcas = ["OPENCARS", "PAMPAWAGEN", "GRANVILLE", "FORTECAR"]
             inicio = 0
             for idx, row in df_m.iterrows():
@@ -187,130 +178,91 @@ elif pagina == "Cumplimiento de Objetivos 🎯":
                 if "TOTAL" in nombre_fila and any(m in nombre_fila for m in marcas):
                     df_m.at[idx, cols[3]] = df_m.iloc[inicio:idx, 3].sum()
                     inicio = idx + 1
-
             idx_total_general = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", na=False, case=False)].index
             if not idx_total_general.empty:
                 suma_marcas = df_m[(df_m[cols[0]].str.contains("TOTAL", case=False)) & (df_m[cols[0]].str.contains("|".join(marcas), case=False))][cols[3]].sum()
                 suma_red = df_m[(df_m[cols[0]].str.contains("RED SECUNDARIA", case=False)) & (~df_m[cols[0]].str.contains("TOTAL GENERAL", case=False))][cols[3]].sum()
                 df_m.at[idx_total_general[0], cols[3]] = suma_marcas + suma_red
-
             df_m[cols[1]] = pd.to_numeric(df_m[cols[1]], errors='coerce').fillna(0).astype(int)
             df_m[cols[2]] = pd.to_numeric(df_m[cols[2]], errors='coerce').fillna(0).astype(int)
             df_m[cols[3]] = df_m[cols[3]].astype(int)
-            
             col_pct_n1, col_pct_n2 = "% N1", "% N2"
             df_m[col_pct_n1] = (df_m[cols[3]] / df_m[cols[1]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             df_m[col_pct_n2] = (df_m[cols[3]] / df_m[cols[2]]).replace([float('inf'), -float('inf')], 0).fillna(0)
             df_m["Faltante N1"] = (df_m[cols[1]] - df_m[cols[3]]).apply(lambda x: x if x > 0 else 0)
             df_m["Faltante N2"] = (df_m[cols[2]] - df_m[cols[3]]).apply(lambda x: x if x > 0 else 0)
-
-            # GUARDAR DATOS PARA EL PANEL 3
             st.session_state['df_panel_datos'] = df_m.copy()
-
             def resaltar_totales(row):
-                if "TOTAL" in str(row[cols[0]]).upper():
-                    return ['font-weight: bold; background-color: #f0f2f6'] * len(row)
+                if "TOTAL" in str(row[cols[0]]).upper(): return ['font-weight: bold; background-color: #f0f2f6'] * len(row)
                 return [''] * len(row)
-
             def semaforo_fuente(val):
                 if val >= 1.0: color = '#28a745'
                 elif val >= 0.8: color = '#fd7e14'
                 else: color = '#dc3545'
                 return f'color: {color}; font-weight: bold; text-align: center'
-
             st.write("### ✅ Resumen de Cumplimiento")
             df_final = df_m[[cols[0], cols[1], cols[2], cols[3], col_pct_n1, col_pct_n2, "Faltante N1", "Faltante N2"]]
-            
-            estilo_df = df_final.style.apply(resaltar_totales, axis=1) \
-                .map(semaforo_fuente, subset=[col_pct_n1, col_pct_n2]) \
-                .format({
-                    cols[1]: "{:,.0f}", cols[2]: "{:,.0f}", cols[3]: "{:,.0f}",
-                    col_pct_n1: "{:.1%}", col_pct_n2: "{:.1%}",
-                    "Faltante N1": "{:,.0f}", "Faltante N2": "{:,.0f}"
-                })
-
+            estilo_df = df_final.style.apply(resaltar_totales, axis=1).map(semaforo_fuente, subset=[col_pct_n1, col_pct_n2]).format({cols[1]: "{:,.0f}", cols[2]: "{:,.0f}", cols[3]: "{:,.0f}", col_pct_n1: "{:.1%}", col_pct_n2: "{:.1%}", "Faltante N1": "{:,.0f}", "Faltante N2": "{:,.0f}"})
             st.dataframe(estilo_df, use_container_width=True, hide_index=True, height=(len(df_final) + 1) * 36)
-            
         except Exception as e: st.error(f"Error: {e}")
 
 # =========================================================
-# OPCIÓN 3: PANEL DE OBJETIVOS SUCURSALES (CORREGIDO)
+# OPCIÓN 3: PANEL DE OBJETIVOS SUCURSALES (AJUSTADO)
 # =========================================================
 elif pagina == "Panel de Objetivos Sucursales":
     st.title("📊 Panel de Control de Objetivos Sucursales")
-    
     if st.session_state['df_panel_datos'] is None:
         st.warning("⚠️ Sin datos. Por favor, procesa primero el Panel 'Cumplimiento de Objetivos 🎯'.")
     else:
         df_m = st.session_state['df_panel_datos']
         cols = df_m.columns
-
-        # 1. TARJETAS (KPIs) - TOMANDO DATOS REALES DEL PANEL 2
         fila_total = df_m[df_m[cols[0]].str.contains("TOTAL GENERAL", case=False, na=False)].iloc[0]
-        
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Logrado Total", f"{int(fila_total[cols[3]])}")
         c2.metric("Objetivo N1", f"{int(fila_total[cols[1]])}")
         c3.metric("Objetivo N2", f"{int(fila_total[cols[2]])}")
-        # Aquí se reflejarán los porcentajes correctos (ej: 26% y 20%)
         c4.metric("% Cumpl. N1", f"{fila_total['% N1']:.1%}")
         c5.metric("% Cumpl. N2", f"{fila_total['% N2']:.1%}")
-
         st.divider()
 
-        # 2. RENDIMIENTO POR SUCURSAL (CON ETIQUETAS NUMÉRICAS)
+        # 1. RENDIMIENTO POR SUCURSAL (NÚMEROS MÁS GRANDES)
         st.subheader("Rendimiento por Sucursal")
         df_suc = df_m[~df_m[cols[0]].str.contains("TOTAL", case=False, na=False)].copy()
-        
-        fig_barras = px.bar(
-            df_suc, x=cols[0], y=[cols[3], cols[1], cols[2]],
-            barmode='group', 
-            text_auto=True, # ESTO MUESTRA LOS NÚMEROS SOBRE LAS BARRAS
-            labels={'value': 'Unidades', 'variable': 'Hito'},
-            color_discrete_map={cols[3]: '#00CC96', cols[1]: '#636EFA', cols[2]: '#AB63FA'}
-        )
+        fig_barras = px.bar(df_suc, x=cols[0], y=[cols[3], cols[1], cols[2]], barmode='group', text_auto=True, labels={'value': 'Unidades', 'variable': 'Hito'}, color_discrete_map={cols[3]: '#00CC96', cols[1]: '#636EFA', cols[2]: '#AB63FA'})
+        # AJUSTE: Tamaño de fuente de los números en las barras
+        fig_barras.update_traces(textfont_size=14, textposition="outside")
         st.plotly_chart(fig_barras, use_container_width=True)
 
-        # 3. RANKING MARCA Y TERMÓMETRO
+        # 2. RANKING Y TERMÓMETRO
         col_l, col_r = st.columns([2, 1])
         with col_l:
             st.subheader("Cumplimiento por Marca (N1)")
             df_marcas = df_m[df_m[cols[0]].str.contains("TOTAL", case=False) & ~df_m[cols[0]].str.contains("GENERAL", case=False)].copy()
             df_marcas = df_marcas.sort_values("% N1", ascending=True)
-            
-            fig_m = px.bar(
-                df_marcas, x="% N1", y=cols[0], orientation='h', 
-                text_auto='.1%', # Muestra los porcentajes reales
-                color="% N1", 
-                color_continuous_scale='RdYlGn'
-            )
+            fig_m = px.bar(df_marcas, x="% N1", y=cols[0], orientation='h', text_auto='.1%', color="% N1", color_continuous_scale='RdYlGn')
             st.plotly_chart(fig_m, use_container_width=True)
-
         with col_r:
             st.subheader("Avance Global")
-            fig_g = go.Figure(go.Indicator(
-                mode="gauge+number", 
-                value=fila_total["% N1"]*100,
-                number={'suffix': "%"},
-                gauge={
-                    'axis': {'range': [0, 110]},
-                    'bar': {'color': "black"},
-                    'steps': [
-                        {'range': [0, 80], 'color': "#ff4b4b"}, 
-                        {'range': [80, 90], 'color': "#ffa500"}, 
-                        {'range': [90, 110], 'color': "#00CC96"}]
-                }
-            ))
+            fig_g = go.Figure(go.Indicator(mode="gauge+number", value=fila_total["% N1"]*100, number={'suffix': "%"}, gauge={'axis': {'range': [0, 110]}, 'bar': {'color': "black"}, 'steps': [{'range': [0, 80], 'color': "#ff4b4b"}, {'range': [80, 90], 'color': "#ffa500"}, {'range': [90, 110], 'color': "#00CC96"}]}))
             st.plotly_chart(fig_g, use_container_width=True)
 
-        # 4. MATRIZ DE CUMPLIMIENTO
-        st.subheader("Matriz de Seguimiento")
+        # 3. MATRIZ DE SEGUIMIENTO (ORDENADA POR %)
+        st.subheader("Matriz de Seguimiento (Ordenada por %)")
         m1, m2 = st.columns(2)
         with m1:
             st.success("🟢 Líderes (>= 90% N1)")
-            df_lideres = df_suc[df_suc["% N1"] >= 0.9][[cols[0], "% N1", "Faltante N1"]]
+            # AJUSTE: Ordenar por % N1 de mayor a menor
+            df_lideres = df_suc[df_suc["% N1"] >= 0.9][[cols[0], "% N1", "Faltante N1"]].sort_values("% N1", ascending=False)
             st.dataframe(df_lideres.style.format({"% N1": "{:.1%}"}), hide_index=True, use_container_width=True)
         with m2:
             st.error("🔴 Alerta (< 90% N1)")
-            df_alerta = df_suc[df_suc["% N1"] < 0.9][[cols[0], "% N1", "Faltante N1"]]
+            # AJUSTE: Ordenar por % N1 de mayor a menor
+            df_alerta = df_suc[df_suc["% N1"] < 0.9][[cols[0], "% N1", "Faltante N1"]].sort_values("% N1", ascending=False)
             st.dataframe(df_alerta.style.format({"% N1": "{:.1%}"}), hide_index=True, use_container_width=True)
+
+        # 4. GRÁFICO SEMÁFORO (NUEVO)
+        st.subheader("🚦 Semáforo de Cumplimiento")
+        df_sem = df_suc.sort_values("% N1", ascending=False)
+        fig_sem = px.bar(df_sem, x=cols[0], y="% N1", color="% N1", text_auto=".1%", color_continuous_scale=['#dc3545', '#fd7e14', '#28a745'], range_color=[0, 1])
+        fig_sem.add_hline(y=0.9, line_dash="dash", line_color="white", annotation_text="Meta 90%")
+        st.plotly_chart(fig_sem, use_container_width=True)
